@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/no-get-request-body",
+    "severity": "error",
+    "message": "Operation is a GET, so it cannot have a request body.",
+    "location": "path-item.yaml#/get/requestBody (key)"
+  }
+]

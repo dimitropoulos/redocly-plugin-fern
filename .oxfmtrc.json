@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "useTabs": false,
+  "tabWidth": 2,
+  "arrowParens": "avoid",
+  "printWidth": 80,
+  "experimentalSortPackageJson": false,
+  "ignorePatterns": [
+    "**/dist",
+    "node_modules",
+    "pnpm-lock.yaml",
+    "test/fixtures/**/output.json",
+    "test/covered-by-redocly/**/output.json"
+  ]
+}

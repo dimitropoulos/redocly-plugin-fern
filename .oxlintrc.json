@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn"],
+  "rules": {
+    "unicorn/no-array-for-each": "off",
+    "curly": "error"
+  },
+  "ignorePatterns": ["**/dist", "node_modules"]
+}

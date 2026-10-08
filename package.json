@@ -1,0 +1,57 @@
+{
+  "name": "redocly-plugin-fern",
+  "version": "0.1.0",
+  "description": "Redocly CLI plugin that ports Fern's API definition validation rules to OpenAPI lint rules",
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:update": "UPDATE_FIXTURES=1 vitest run",
+    "lint": "oxlint",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test"
+  },
+  "keywords": [
+    "redocly",
+    "redocly-plugin",
+    "openapi",
+    "fern",
+    "lint"
+  ],
+  "peerDependencies": {
+    "@redocly/openapi-core": ">=2.0.0"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.60.0",
+    "@redocly/openapi-core": "^2.60.0",
+    "@types/lodash-es": "^4.17.12",
+    "@types/node": "^26.6.4",
+    "oxfmt": "^0.72.0",
+    "oxlint": "^1.87.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "@redocly/ajv": "^8.18.3",
+    "ajv-formats": "^3.0.1",
+    "lodash-es": "^4.18.1"
+  }
+}
