@@ -2,13 +2,7 @@
   {
     "ruleId": "fern/no-undefined-variable-reference",
     "severity": "error",
-    "message": "Variable appId is not defined. Declare it in x-fern-sdk-variables at the root of the document.",
-    "location": "openapi.yaml#/paths/~1apps~1{appId}~1users/get/parameters/0/x-fern-sdk-variable"
-  },
-  {
-    "ruleId": "fern/no-undefined-variable-reference",
-    "severity": "error",
-    "message": "x-fern-sdk-variables must be an object mapping variable names to schemas with type: string.",
+    "message": "x-fern-sdk-variables must be an object mapping variable names to schemas with type: string. Fern fails to import the document.",
     "location": "openapi.yaml#/x-fern-sdk-variables"
   }
 ]

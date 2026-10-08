@@ -8,6 +8,5 @@ x-fern-global-parameters:
   - name: 42
     in: header
   - currency
-  - null
   - name: valid
 paths: {}

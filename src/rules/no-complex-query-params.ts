@@ -1,11 +1,14 @@
 /**
- * Reports `in: query` parameters whose schema is, or transitively contains, a discriminated union.
- * The search follows `$ref`s, array `items`, map values (`additionalProperties`), object
- * `properties`, `allOf` members and the members of undiscriminated unions, and stops at cycles.
+ * Reports `in: query` parameters whose schema is, or transitively contains, a schema Fern's
+ * importer turns into a discriminated union (see `isDiscriminatedUnion`). The search follows the
+ * types Fern generates: `$ref`s, array `items`, map values (`additionalProperties` without
+ * `properties`), non-ignored object `properties`, inherited `allOf` parents (not discriminated
+ * union parents, which Fern does not inherit; the object members of `oneOf`/`anyOf` parents, whose
+ * properties Fern inlines) and the members of undiscriminated unions, and stops at cycles.
  */
 import { getOperations, rootOf } from "../utils/document.js";
 import { isPlainObject, isRefNode, resolveNode } from "../utils/resolve.js";
-import { refName } from "../utils/schema.js";
+import { refName, schemaTypes } from "../utils/schema.js";
 import { isDiscriminatedUnion, isFernEndpoint } from "../utils/structure.js";
 import type {
   AnyNode,
@@ -44,10 +47,10 @@ function findDiscriminatedUnion(
     if (schema["x-fern-type"] !== undefined) {
       return undefined;
     }
-    if (isDiscriminatedUnion(schema)) {
+    if (isDiscriminatedUnion(ctx, resolved)) {
       return { name: currentName, path };
     }
-    const child = (
+    const visitChild = (
       keys: (string | number)[],
       label: string,
     ): Found | undefined => {
@@ -63,38 +66,110 @@ function findDiscriminatedUnion(
         label,
       ]);
     };
-
-    const items = child(["items"], "items");
-    if (items !== undefined) {
-      return items;
-    }
-    if (isPlainObject(schema.additionalProperties)) {
-      const values = child(["additionalProperties"], "additionalProperties");
-      if (values !== undefined) {
-        return values;
-      }
-    }
-    if (isPlainObject(schema.properties)) {
-      for (const property of Object.keys(schema.properties)) {
-        const found = child(["properties", property], `properties.${property}`);
+    const first = (
+      candidates: (() => Found | undefined)[],
+    ): Found | undefined => {
+      for (const candidate of candidates) {
+        const found = candidate();
         if (found !== undefined) {
           return found;
         }
       }
+      return undefined;
+    };
+
+    const candidates: (() => Found | undefined)[] = [];
+    if (schemaTypes(schema).includes("array")) {
+      candidates.push(() => visitChild(["items"], "items"));
     }
-    for (const keyword of ["allOf", "oneOf", "anyOf"] as const) {
+    const hasProperties =
+      isPlainObject(schema.properties) &&
+      Object.keys(schema.properties).length > 0;
+    const allOf: AnyNode[] = Array.isArray(schema.allOf) ? schema.allOf : [];
+    if (
+      isPlainObject(schema.additionalProperties) &&
+      !hasProperties &&
+      allOf.length === 0
+    ) {
+      candidates.push(() =>
+        visitChild(["additionalProperties"], "additionalProperties"),
+      );
+    }
+    if (hasProperties) {
+      for (const [property, value] of Object.entries(schema.properties)) {
+        if (isPlainObject(value) && value["x-fern-ignore"] === true) {
+          continue;
+        }
+        candidates.push(() =>
+          visitChild(["properties", property], `properties.${property}`),
+        );
+      }
+    }
+    const filteredAllOf = allOf
+      .map((member, index) => ({ member, index }))
+      .filter(
+        ({ member }) =>
+          isRefNode(member) ||
+          (isPlainObject(member) && Object.keys(member).length > 0),
+      );
+    const allOfIsAlias =
+      !hasProperties &&
+      filteredAllOf.length === 1 &&
+      (schema.additionalProperties == null ||
+        schema.additionalProperties === false);
+    for (const { member, index } of filteredAllOf) {
+      const label = `allOf[${index}]`;
+      if (allOfIsAlias || !isRefNode(member)) {
+        candidates.push(() => visitChild(["allOf", index], label));
+        continue;
+      }
+      const parent = resolveNode(
+        ctx,
+        member,
+        resolved.location.child(["allOf", index]),
+      );
+      if (parent === undefined || !isPlainObject(parent.node)) {
+        continue;
+      }
+      if (
+        isPlainObject(parent.node.discriminator) &&
+        parent.node.discriminator.mapping != null
+      ) {
+        continue;
+      }
+      const variants = Array.isArray(parent.node.oneOf)
+        ? "oneOf"
+        : Array.isArray(parent.node.anyOf)
+          ? "anyOf"
+          : undefined;
+      if (variants === undefined) {
+        candidates.push(() => visitChild(["allOf", index], label));
+        continue;
+      }
+      parent.node[variants].forEach((variant: AnyNode, position: number) => {
+        candidates.push(() =>
+          visit(
+            {
+              node: variant,
+              location: parent.location.child([variants, position]),
+            },
+            [...path, label, `${variants}[${position}]`],
+          ),
+        );
+      });
+    }
+    for (const keyword of ["oneOf", "anyOf"] as const) {
       const members = schema[keyword];
       if (!Array.isArray(members)) {
         continue;
       }
-      for (let index = 0; index < members.length; index++) {
-        const found = child([keyword, index], `${keyword}[${index}]`);
-        if (found !== undefined) {
-          return found;
-        }
-      }
+      members.forEach((_member: AnyNode, index: number) => {
+        candidates.push(() =>
+          visitChild([keyword, index], `${keyword}[${index}]`),
+        );
+      });
     }
-    return undefined;
+    return first(candidates);
   };
 
   return visit(start, []);
@@ -144,7 +219,7 @@ export const noComplexQueryParams: RuleDefinition = {
                 ? `is ${union}`
                 : `contains ${union} (at ${found.path.join(" > ")})`;
             ctx.report({
-              message: `\`in: query\` parameter "${parameter.name}" has a schema that ${relation}. Discriminated unions (oneOf/anyOf with a discriminator) are not valid in query parameters.`,
+              message: `\`in: query\` parameter "${parameter.name}" has a schema that ${relation}. Discriminated unions are not valid types for query parameters. Fern imports a oneOf/anyOf as a discriminated union when it has a \`discriminator.mapping\` or when each member has a distinct single-value string \`enum\`/\`const\` in the same property; on a oneOf, \`x-fern-discriminated: false\` imports it as an undiscriminated union instead.`,
               location: schemaLocation.key(),
             });
           }

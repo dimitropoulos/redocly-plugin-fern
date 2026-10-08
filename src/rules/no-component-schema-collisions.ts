@@ -12,8 +12,9 @@
  *   Redocly config file (or the working directory when there is none). The linted document itself
  *   may be listed too; it is skipped.
  * - `resolveSchemaCollisions` (boolean, default false): mirrors the `resolve-schema-collisions`
- *   generators.yml setting, which makes Fern rename colliding schemas. When true, the rule reports
- *   nothing.
+ *   generators.yml setting. fern check stays quiet when it is set, but Fern only renames colliding
+ *   schemas within one spec, so schemas of different specs still overwrite each other; the rule
+ *   keeps reporting and says so.
  */
 import { readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
@@ -79,9 +80,6 @@ export const noComponentSchemaCollisions: RuleDefinition = {
   rule: (options: Options = {}) => ({
     Root: {
       leave(root: AnyNode, ctx: UserContext) {
-        if (options.resolveSchemaCollisions === true) {
-          return;
-        }
         const { apis } = options;
         if (apis === undefined) {
           return;
@@ -130,7 +128,7 @@ export const noComponentSchemaCollisions: RuleDefinition = {
               continue;
             }
             ctx.report({
-              message: `Component schema collision detected: Schema '${schemaId}' is defined in both '${currentDisplay}' and '${other.display}'. One will overwrite the other when Fern merges the specs. Rename the schema in one of the specs or use namespaces to avoid conflicts.`,
+              message: `Component schema collision detected: Schema '${schemaId}' is defined in both '${currentDisplay}' and '${other.display}'. One will overwrite the other when Fern merges the specs${options.resolveSchemaCollisions === true ? " (resolve-schema-collisions only renames colliding schemas within one spec, and fern check does not report this when it is set)" : ""}. Rename the schema in one of the specs or use namespaces to avoid conflicts.`,
               location: schemas.location.child(schemaId).key(),
             });
           }

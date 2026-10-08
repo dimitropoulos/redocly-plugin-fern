@@ -257,32 +257,202 @@ export function isFileSchema(node: AnyNode, depth = 0): boolean {
   );
 }
 
+function isListOfStrings(value: AnyNode): value is string[] {
+  return Array.isArray(value) && value.every(item => typeof item === "string");
+}
+
 /**
- * Whether Fern's importer turns a schema into a discriminated union: a `oneOf`/`anyOf` with a
- * `discriminator` (unless `x-fern-undiscriminated: true` or `x-fern-discriminated: false`), or a
- * `discriminator.mapping` without `oneOf`/`anyOf`.
+ * The discriminant values a union member offers, as Fern's importer infers them: string
+ * properties with a single `enum` value or a `const`, and a `type` property with an `example`.
+ * A member with `anyOf` offers the values of its `anyOf` members.
  */
-export function isDiscriminatedUnion(schema: AnyNode): boolean {
-  if (!isPlainObject(schema) || schema["x-fern-discriminated"] === false) {
+function possibleDiscriminants(
+  ctx: Ctx,
+  member: Located,
+  depth = 0,
+): Map<string, string> {
+  const result = new Map<string, string>();
+  const resolved = resolveNode(ctx, member.node, member.location);
+  if (resolved === undefined || !isPlainObject(resolved.node) || depth > 16) {
+    return result;
+  }
+  const schema = resolved.node;
+  if (Array.isArray(schema.anyOf)) {
+    schema.anyOf.forEach((element: AnyNode, index: number) => {
+      const child = {
+        node: element,
+        location: resolved.location.child(["anyOf", index]),
+      };
+      for (const [key, value] of possibleDiscriminants(ctx, child, depth + 1)) {
+        result.set(key, value);
+      }
+    });
+    return result;
+  }
+  if (!isPlainObject(schema.properties)) {
+    return result;
+  }
+  for (const name of Object.keys(schema.properties)) {
+    const property = resolveChild(
+      ctx,
+      {
+        node: schema.properties,
+        location: resolved.location.child("properties"),
+      },
+      name,
+    )?.node;
+    if (!isPlainObject(property)) {
+      continue;
+    }
+    if (
+      property.type === "string" &&
+      isListOfStrings(property.enum) &&
+      new Set(property.enum.map(value => value.toLowerCase())).size === 1
+    ) {
+      result.set(name, property.enum[0]!);
+    }
+    if (property.type === "string" && property.const != null) {
+      result.set(name, String(property.const));
+    }
+    if (name === "type" && property.example != null) {
+      result.set(name, String(property.example));
+    }
+  }
+  return result;
+}
+
+/** Whether Fern infers a discriminant: a property whose values are distinct across all members. */
+function hasInferredDiscriminant(
+  ctx: Ctx,
+  located: Located,
+  keyword: "oneOf" | "anyOf",
+): boolean {
+  const members: AnyNode[] = located.node[keyword];
+  const variants = new Map<string, Set<string>>();
+  members.forEach((member, index) => {
+    const child = {
+      node: member,
+      location: located.location.child([keyword, index]),
+    };
+    for (const [key, value] of possibleDiscriminants(ctx, child)) {
+      const values = variants.get(key) ?? new Set<string>();
+      values.add(value);
+      variants.set(key, values);
+    }
+  });
+  return [...variants.values()].some(values => values.size === members.length);
+}
+
+function hasNonEmptyMapping(schema: Record<string, AnyNode>): boolean {
+  return (
+    isPlainObject(schema.discriminator) &&
+    isPlainObject(schema.discriminator.mapping) &&
+    Object.keys(schema.discriminator.mapping).length > 0
+  );
+}
+
+/**
+ * Whether Fern's importer turns a (resolved) schema into a discriminated union:
+ *
+ * - `type: object` with a `discriminator.mapping`;
+ * - a `oneOf` with a non-empty `discriminator.mapping`, unless `x-fern-undiscriminated: true`;
+ * - a `oneOf` of two or more members (not a `{type: "null"}` pair, not all enums) whose members
+ *   share a property with a distinct single-value string `enum`/`const` (or a `type` property
+ *   with an `example`) in each member, unless `x-fern-undiscriminated: true`;
+ * - an `anyOf` of two or more members (not a `{type: "null"}` pair) with such a property;
+ * - a non-empty `discriminator.mapping` without `oneOf`/`anyOf`.
+ *
+ * `x-fern-discriminated: false` makes a `oneOf` undiscriminated, and `x-fern-discriminated: true`
+ * overrides `x-fern-undiscriminated`. Schemas Fern converts before reaching unions (primitives,
+ * arrays, enums, `const`, maps, multi-type `type` arrays) are never discriminated unions.
+ */
+export function isDiscriminatedUnion(ctx: Ctx, located: Located): boolean {
+  const schema = located.node;
+  if (!isPlainObject(schema) || schema["x-fern-type"] !== undefined) {
     return false;
   }
-  const discriminator = schema.discriminator;
-  if (!isPlainObject(discriminator)) {
+  const types = schemaTypes(schema).filter(type => type !== "null");
+  if (types.length > 1 || "const" in schema) {
     return false;
   }
-  const hasMembers =
-    (Array.isArray(schema.oneOf) && schema.oneOf.length > 0) ||
-    (Array.isArray(schema.anyOf) && schema.anyOf.length > 0);
-  if (hasMembers) {
+  const type = types[0];
+  if (
+    schema.enum != null &&
+    (type === undefined || type === "string" || type === "enum")
+  ) {
+    return false;
+  }
+  if (
+    type !== undefined &&
+    ["boolean", "number", "integer", "float", "string", "array"].includes(type)
+  ) {
+    return false;
+  }
+  if (
+    schema.additionalProperties != null &&
+    schema.additionalProperties !== false &&
+    hasNoProperties(schema) &&
+    (schema.allOf == null || schema.allOf.length === 0)
+  ) {
+    return false;
+  }
+  const discriminated = schema["x-fern-discriminated"];
+  const undiscriminated = Boolean(schema["x-fern-undiscriminated"]);
+  const oneOf = Array.isArray(schema.oneOf) ? schema.oneOf : undefined;
+  if (discriminated !== true && isPresenceConstraint(schema)) {
+    return false;
+  }
+  if (oneOf !== undefined && oneOf.length > 0 && discriminated === false) {
+    return false;
+  }
+  if (
+    type === "object" &&
+    isPlainObject(schema.discriminator) &&
+    schema.discriminator.mapping != null
+  ) {
+    return true;
+  }
+  if (oneOf !== undefined && oneOf.length > 0) {
+    if (hasNonEmptyMapping(schema)) {
+      return discriminated === true || !undiscriminated;
+    }
+    if (oneOf.length === 1) {
+      return false;
+    }
+    if (
+      oneOf.length === 2 &&
+      (isNullMember(oneOf[0]) || isNullMember(oneOf[1]))
+    ) {
+      return false;
+    }
+    const allEnums = oneOf.every(
+      (member: AnyNode) =>
+        isPlainObject(member) &&
+        !isRefNode(member) &&
+        isListOfStrings(member.enum),
+    );
+    if (allEnums) {
+      return false;
+    }
     return (
-      schema["x-fern-undiscriminated"] !== true ||
-      schema["x-fern-discriminated"] === true
+      (discriminated === true || !undiscriminated) &&
+      hasInferredDiscriminant(ctx, located, "oneOf")
     );
   }
-  return (
-    isPlainObject(discriminator.mapping) &&
-    Object.keys(discriminator.mapping).length > 0
-  );
+  const anyOf = Array.isArray(schema.anyOf) ? schema.anyOf : undefined;
+  if (anyOf !== undefined && anyOf.length > 0) {
+    if (anyOf.length === 1) {
+      return false;
+    }
+    if (
+      anyOf.length === 2 &&
+      (isNullMember(anyOf[0]) || isNullMember(anyOf[1]))
+    ) {
+      return false;
+    }
+    return hasInferredDiscriminant(ctx, located, "anyOf");
+  }
+  return hasNonEmptyMapping(schema);
 }
 
 export type FernSchemaKind =

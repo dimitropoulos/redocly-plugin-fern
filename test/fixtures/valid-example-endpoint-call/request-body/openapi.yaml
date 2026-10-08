@@ -72,7 +72,7 @@ paths:
         "204":
           description: Uploaded
       x-fern-examples:
-        - name: Multipart bodies are not validated
+        - name: File parts of multipart bodies are unexpected
           request:
             file: 42
   /plants/notes:

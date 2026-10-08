@@ -7,16 +7,17 @@ paths:
     post:
       operationId: createPlant
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/10000Plants"
+              $ref: "#/components/schemas/日本"
       responses:
         "204":
           description: Created.
 components:
   schemas:
-    10000Plants:
+    日本:
       type: object
       properties:
         names:

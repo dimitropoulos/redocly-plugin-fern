@@ -2,7 +2,7 @@
   {
     "ruleId": "fern/valid-stream-condition",
     "severity": "error",
-    "message": "stream-condition $request.stream requires a JSON request body, but endpoint missingRequestBody has none.",
+    "message": "stream-condition $request.stream requires a JSON request body, but endpoint missingRequestBody has none, so Fern generates its streaming and non-streaming endpoints without a request body to select between them.",
     "location": "openapi.yaml#/paths/~1chat/post/x-fern-streaming/stream-condition"
   },
   {
@@ -14,7 +14,7 @@
   {
     "ruleId": "fern/valid-stream-condition",
     "severity": "error",
-    "message": "stream-condition $request.stream requires a JSON request body, but endpoint formRequestBody has none.",
+    "message": "stream-condition $request.stream requires a JSON request body, but endpoint formRequestBody has none, so Fern generates its streaming and non-streaming endpoints without a request body to select between them.",
     "location": "openapi.yaml#/paths/~1chat~1form/post/x-fern-streaming/stream-condition"
   }
 ]

@@ -2,7 +2,7 @@
   {
     "ruleId": "fern/no-duplicate-field-names",
     "severity": "error",
-    "message": "Name \"ok\" is used by multiple enum values: \"ok\" and \"okay\" (Fern compares enum names case-insensitively). Fern keeps \"ok\" and drops \"okay\". Give each value a unique name with x-fern-enum.",
+    "message": "Fern silently drops enum value \"okay\" from the generated SDK: its name \"ok\" matches the name \"OK\" of the earlier value \"ok\" when compared case-insensitively. Give each value a unique name with x-fern-enum.",
     "location": "openapi.yaml#/components/schemas/Status/x-enum-varnames/1"
   }
 ]

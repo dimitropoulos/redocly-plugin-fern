@@ -41,3 +41,14 @@ paths:
       responses:
         "204":
           description: No content
+components:
+  schemas:
+    Document:
+      type: object
+      properties:
+        body:
+          type: string
+          x-fern-type: text
+        raw:
+          type: string
+          x-fern-type: optional<bytes>

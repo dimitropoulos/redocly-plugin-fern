@@ -20,13 +20,13 @@
   {
     "ruleId": "fern/no-response-property",
     "severity": "error",
-    "message": "x-fern-sdk-return-value has no effect on endpoint sseStream: it streams server-sent events (x-fern-streaming format: sse), and Fern only applies it to JSON responses.",
+    "message": "x-fern-sdk-return-value has no effect on endpoint sseStream: it streams server-sent events (x-fern-streaming format: sse), and Fern only applies it to non-streaming JSON responses.",
     "location": "openapi.yaml#/paths/~1d/post/x-fern-sdk-return-value"
   },
   {
     "ruleId": "fern/no-response-property",
     "severity": "error",
-    "message": "x-fern-sdk-return-value has no effect on endpoint conditionWithoutResponse: its x-fern-streaming stream-condition has no response schema, and Fern only applies it to JSON responses.",
+    "message": "Response must be an object in order to return a property as a response: endpoint conditionWithoutResponse has an x-fern-streaming stream-condition without a response schema, so Fern imports its non-streaming response as an untyped value and x-fern-sdk-return-value cannot select a property from it.",
     "location": "openapi.yaml#/paths/~1e/post/x-fern-sdk-return-value"
   }
 ]

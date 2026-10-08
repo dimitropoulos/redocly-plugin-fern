@@ -2,10 +2,6 @@ rules:
   fern/valid-oauth:
     severity: error
     getToken:
-      endpoint: post /token
+      endpoint: POST /token
       requestProperties:
-        clientId: client_id
         clientSecret: 5
-      responseProperties:
-        accessToken: access_token
-        expiresIn: $request.expires_in

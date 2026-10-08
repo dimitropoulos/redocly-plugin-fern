@@ -102,7 +102,10 @@ export function convertNumberToSnakeCase(number: number): string | undefined {
     : `${SINGLE_DIGITS[thousands]}_thousand_${convertNumberToSnakeCase(remainder)}`;
 }
 
-/** Spells out a leading number (`2fa` → `two_fa`), undefined when there is none. */
+/**
+ * Spells out a leading number (`2fa` → `two_fa`), undefined when there is none. Like Fern, a number
+ * above 9999 followed by more text is spelled `undefined` (`10000Items` → `undefined_Items`).
+ */
 export function replaceStartingNumber(input: string): string | undefined {
   const matches = input.match(NUMERIC_REGEX);
   if (matches !== null && matches[0] !== undefined) {
@@ -111,11 +114,8 @@ export function replaceStartingNumber(input: string): string | undefined {
     const parsedNumber = parseFloat(numericPart);
     if (!isNaN(parsedNumber) && isFinite(parsedNumber)) {
       const snakeCasedNumber = convertNumberToSnakeCase(parsedNumber);
-      if (snakeCasedNumber === undefined) {
-        return undefined;
-      }
       return nonNumericPart.length > 0
-        ? `${snakeCasedNumber}_${nonNumericPart}`
+        ? `${String(snakeCasedNumber)}_${nonNumericPart}`
         : snakeCasedNumber;
     }
   }

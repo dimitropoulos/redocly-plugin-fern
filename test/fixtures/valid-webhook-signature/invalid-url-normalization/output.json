@@ -2,7 +2,7 @@
   {
     "ruleId": "fern/valid-webhook-signature",
     "severity": "error",
-    "message": "url-normalization must enable at least one of port-variants or legacy-query-encoding",
+    "message": "url-normalization must enable at least one of port-variants or legacy-query-encoding; Fern ignores it otherwise.",
     "location": "openapi.yaml#/webhooks/a/post/x-fern-webhook-signature/url-normalization"
   },
   {

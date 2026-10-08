@@ -1,0 +1,3 @@
+rules:
+  security-defined: error
+  fern/no-missing-auth: error

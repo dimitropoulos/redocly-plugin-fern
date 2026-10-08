@@ -68,6 +68,7 @@ export const noUndefinedPathParameters: RuleDefinition = {
             ctx.report({
               message: `Path parameter is unreferenced in x-fern-base-path '${path}': ${name}. Fern ignores it.`,
               location: parameters.location.child([name]).key(),
+              forceSeverity: "warn",
             });
           }
         }

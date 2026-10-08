@@ -74,7 +74,7 @@ function checkCondition(
   const media = getJsonMediaType(ctx, requestBody);
   if (media === undefined) {
     ctx.report({
-      message: `stream-condition ${value} requires a JSON request body, but endpoint ${endpointId(operation)} has none.`,
+      message: `stream-condition ${value} requires a JSON request body, but endpoint ${endpointId(operation)} has none, so Fern generates its streaming and non-streaming endpoints without a request body to select between them.`,
       location,
     });
     return;
@@ -114,6 +114,7 @@ function checkCondition(
     ctx.report({
       message: `Property "${value}" must be a boolean to be used as a stream-condition. Fern replaces it with a boolean in the generated request types.`,
       location: found.schema.location,
+      forceSeverity: "warn",
     });
   }
 }
@@ -134,7 +135,9 @@ function checkObject(
     streaming.format !== "json"
   ) {
     ctx.report({
-      message: `${EXTENSION} format must be 'sse' or 'json'.`,
+      message: hasCondition
+        ? `${EXTENSION} format must be 'sse' or 'json'.`
+        : `${EXTENSION} format must be 'sse' or 'json'. Fern ignores x-fern-streaming with another format, so endpoint ${endpointId(operation)} does not stream.`,
       location: location.child("format"),
     });
   }
@@ -143,12 +146,13 @@ function checkObject(
       ctx.report({
         message: `${EXTENSION} ${field} must be a string.`,
         location: location.child(field),
+        forceSeverity: "warn",
       });
     }
   }
   if (streaming.resumable != null && typeof streaming.resumable !== "boolean") {
     ctx.report({
-      message: `${EXTENSION} resumable must be a boolean.`,
+      message: `${EXTENSION} resumable must be a boolean. Fern treats any other value as false.`,
       location: location.child("resumable"),
     });
   } else if (streaming.resumable === true && streaming.format !== "sse") {
@@ -169,9 +173,14 @@ function checkObject(
 
   if (hasCondition) {
     if (!hasResponse || !hasResponseStream) {
+      const untyped =
+        !hasResponse && !hasResponseStream
+          ? "non-streaming and streamed responses"
+          : hasResponse
+            ? "streamed response"
+            : "non-streaming response";
       ctx.report({
-        message:
-          "stream-condition can only be used if both response and response-stream are specified.",
+        message: `stream-condition can only be used if both response and response-stream are specified. Fern types the ${untyped} of endpoint ${endpointId(operation)} as unknown.`,
         location: location.child("stream-condition"),
       });
     }
@@ -186,8 +195,7 @@ function checkObject(
 
   if (hasResponse && hasResponseStream) {
     ctx.report({
-      message:
-        "stream-condition must be specified when both response and response-stream are specified.",
+      message: `stream-condition must be specified when both response and response-stream are specified. Without it, Fern ignores both schemas and endpoint ${endpointId(operation)} only streams its OpenAPI success response.`,
       location,
     });
     return;
@@ -223,7 +231,7 @@ export const validStreamCondition: RuleDefinition = {
           const location = operation.location.child(EXTENSION);
           if (!isPlainObject(streaming)) {
             ctx.report({
-              message: `${EXTENSION} must be true or an object.`,
+              message: `${EXTENSION} must be true or an object. Fern ignores any other value, so endpoint ${endpointId(operation)} does not stream.`,
               location,
             });
             continue;

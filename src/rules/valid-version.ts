@@ -1,7 +1,7 @@
 /**
  * Validates `x-fern-version`, the API version header declaration Fern turns into an enum:
- * `header` and `values` are required and well formed, values are unique, and `default` is one of
- * the values.
+ * `header` and `values` are required and well formed (fern check accepts malformed shapes, but SDK
+ * generation then fails), values are unique, and `default` is one of the values.
  */
 import { rootOf } from "../utils/document.js";
 import { describeValue, isNonEmptyString } from "../utils/extensions.js";
@@ -26,7 +26,7 @@ export const validVersion: RuleDefinition = {
         if (!isPlainObject(version.node)) {
           ctx.report({
             message:
-              "x-fern-version must be an object with a `header` and a list of `values`.",
+              "x-fern-version must be an object with a `header` and a list of `values`. fern check does not catch this, but SDK generation fails.",
             location: version.location,
           });
           return;
@@ -35,7 +35,7 @@ export const validVersion: RuleDefinition = {
         if (header === undefined || header === null) {
           ctx.report({
             message:
-              "x-fern-version must specify the `header` that carries the version.",
+              "x-fern-version must specify the `header` that carries the version. fern check does not catch this, but SDK generation fails.",
             location: version.location.child(["header"]).key(),
           });
         } else if (
@@ -44,7 +44,7 @@ export const validVersion: RuleDefinition = {
         ) {
           ctx.report({
             message:
-              "x-fern-version `header` must be a header name, or an object whose `value` is the header name.",
+              "x-fern-version `header` must be a header name, or an object whose `value` is the header name. fern check does not catch this, but SDK generation fails.",
             location: isPlainObject(header)
               ? version.location.child(["header", "value"])
               : version.location.child(["header"]),
@@ -53,8 +53,7 @@ export const validVersion: RuleDefinition = {
 
         if (!Array.isArray(values)) {
           ctx.report({
-            message:
-              "x-fern-version must list the allowed versions in `values`.",
+            message: `x-fern-version must list the allowed versions in \`values\`. ${values === undefined || values === null ? "Fern crashes while reading the document." : "fern check does not catch this, but SDK generation fails."}`,
             location:
               values === undefined
                 ? version.location.child(["values"]).key()
@@ -74,7 +73,7 @@ export const validVersion: RuleDefinition = {
           if (value === undefined) {
             ctx.report({
               message:
-                "x-fern-version values must be strings, or objects with a string `value`.",
+                "x-fern-version values must be strings, or objects with a string `value`. fern check does not catch this, but SDK generation fails.",
               location: isPlainObject(entry)
                 ? location.child(["value"])
                 : location,
@@ -83,7 +82,7 @@ export const validVersion: RuleDefinition = {
           }
           if (seen.has(value)) {
             ctx.report({
-              message: `Version "${value}" is listed more than once in x-fern-version values.`,
+              message: `Version "${value}" is listed more than once in x-fern-version values. Fern generates the version enum with a member per entry, so two members share the value "${value}" (duplicated values are rejected in every other Fern enum).`,
               location,
             });
           }

@@ -5,8 +5,8 @@ info:
 x-fern-global-headers:
   - header: X-API-Version
     type: Version
-  - header: X-Count
-    type: 5
+  - header: X-Tags
+    type: map<Tag, string>
 x-fern-idempotency-headers:
   - header: Idempotency-Key
     type: optional<Key>

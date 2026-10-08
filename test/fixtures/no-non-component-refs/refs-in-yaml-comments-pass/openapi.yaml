@@ -17,5 +17,4 @@ paths:
 components:
   schemas:
     User:
-      description: 'Not a reference: $ref: "#/paths/~1users"'
       type: object

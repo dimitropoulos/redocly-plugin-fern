@@ -2,13 +2,13 @@
   {
     "ruleId": "fern/no-duplicate-field-names",
     "severity": "error",
-    "message": "Name \"one\" is used by multiple enum values: \"1\" and \"one\" (Fern compares enum names case-insensitively). Fern keeps \"1\" and drops \"one\". Give each value a unique name with x-fern-enum.",
+    "message": "Fern silently drops enum value \"one\" from the generated SDK: its name \"one\" matches the name \"One\" of the earlier value \"1\" when compared case-insensitively. Give each value a unique name with x-fern-enum.",
     "location": "openapi.yaml#/components/schemas/Count/enum/1"
   },
   {
     "ruleId": "fern/no-duplicate-field-names",
     "severity": "error",
-    "message": "Name \"inProgress\" is used by multiple enum values: \"in-progress\" and \"inProgress\" (Fern compares enum names case-insensitively). Fern keeps \"in-progress\" and drops \"inProgress\". Give each value a unique name with x-fern-enum.",
+    "message": "Fern silently drops enum value \"inProgress\" from the generated SDK: its name \"inProgress\" matches the name \"InProgress\" of the earlier value \"in-progress\" when compared case-insensitively. Give each value a unique name with x-fern-enum.",
     "location": "openapi.yaml#/components/schemas/Plant/properties/size/enum/2"
   }
 ]

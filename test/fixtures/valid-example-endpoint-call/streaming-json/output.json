@@ -2,6 +2,12 @@
   {
     "ruleId": "fern/valid-example-endpoint-call",
     "severity": "error",
+    "message": "Invalid response example: Expected example to be an object. Example is: \"not a plant\"",
+    "location": "openapi.yaml#/paths/~1plants~1chat/post/x-fern-examples/0/response/body"
+  },
+  {
+    "ruleId": "fern/valid-example-endpoint-call",
+    "severity": "error",
     "message": "Invalid stream event 1 example at \"/name\": Expected example to be a string. Example is: 3",
     "location": "openapi.yaml#/paths/~1plants~1stream/get/x-fern-examples/1/response/stream/1/name"
   },

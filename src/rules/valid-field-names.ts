@@ -3,10 +3,13 @@
  * for code generation: they must start with a letter and only contain letters, numbers and
  * underscores.
  *
- * Enums: an `x-fern-enum.<value>.name` or `x-enum-varnames` entry (after Fern removes the prefix
- * shared by all entries) that is not a valid name is ignored by Fern; a value whose generated name
- * is still invalid needs an `x-fern-enum` name; `x-fern-enum` entries for values that are not in
- * `enum` are ignored.
+ * Enums: Fern ignores an `x-fern-enum.<value>.name` or `x-enum-varnames` entry (after removing the
+ * prefix shared by all entries) that is not a valid name, logs a warning and falls back on the name
+ * it generates from the value. That is a warning, or an error when the fallback is not valid
+ * either. A value without a valid name override whose generated name is invalid is an error,
+ * unless Fern drops the value because its name repeats an earlier one.
+ * `x-fern-enum` entries for values that are not in `enum`, and an `x-fern-enum` that is not an
+ * object, are silently ignored (warnings).
  *
  * Discriminated unions: `discriminator.x-fern-property-name`, else `discriminator.propertyName`.
  */
@@ -39,8 +42,14 @@ function checkEnum(
   if (fernEnum === undefined) {
     return;
   }
+  const names = new Set<string>();
   for (const value of fernEnum.values) {
     const { override } = value;
+    const generatedIsValid = VALID_NAME_REGEX.test(value.generatedName);
+    // Fern drops values whose name repeats an earlier one (see no-duplicate-field-names), so it
+    // never validates their names.
+    const dropped = names.has(value.name.toLowerCase());
+    names.add(value.name.toLowerCase());
     if (override !== undefined && !value.overrideIsValid) {
       const subject =
         override.source === "x-fern-enum"
@@ -48,12 +57,21 @@ function checkEnum(
           : override.raw === override.name
             ? `x-enum-varnames entry "${override.raw}"`
             : `x-enum-varnames entry "${override.raw}" (which becomes "${override.name}" once Fern removes the prefix shared by all entries)`;
+      const fallback = generatedIsValid
+        ? `Fern ignores it and uses the name it generates from the value, "${value.generatedName}".`
+        : value.generatedName === ""
+          ? "Fern ignores it and cannot generate a name from the value either."
+          : `Fern ignores it and falls back on the name it generates from the value, "${value.generatedName}", which is not valid either.`;
       ctx.report({
-        message: `${subject} for enum value "${value.value}" is not suitable for code generation. ${NAME_REQUIREMENT} Fern ignores it and uses "${value.generatedName}".`,
+        message: `${subject} for enum value "${value.value}" is not suitable for code generation. ${NAME_REQUIREMENT} ${fallback}`,
         location: override.location,
+        ...(generatedIsValid || dropped
+          ? { forceSeverity: "warn" as const }
+          : {}),
       });
+      continue;
     }
-    if (!value.overrideIsValid && !VALID_NAME_REGEX.test(value.generatedName)) {
+    if (!value.overrideIsValid && !generatedIsValid && !dropped) {
       const generated =
         value.generatedName === ""
           ? "Fern cannot generate a name from it"
@@ -66,8 +84,10 @@ function checkEnum(
   }
   if (schema["x-fern-enum"] !== undefined && fernEnum.fernEnum === undefined) {
     ctx.report({
-      message: "x-fern-enum must be an object keyed by enum value.",
+      message:
+        "x-fern-enum must be an object keyed by enum value; Fern ignores it.",
       location: location.child("x-fern-enum"),
+      forceSeverity: "warn",
     });
   }
   if (fernEnum.fernEnum !== undefined) {
@@ -77,6 +97,7 @@ function checkEnum(
         ctx.report({
           message: `x-fern-enum has an entry for "${key}", which is not one of the enum values, so Fern ignores it.`,
           location: location.child(["x-fern-enum", key]).key(),
+          forceSeverity: "warn",
         });
       }
     }

@@ -25,10 +25,11 @@ export const validGlobalParameters: RuleDefinition = {
         const root = rootOf(rootNode, ctx);
         const declared = new Map<string, number>();
         const declarations = rootValue(ctx, root, "x-fern-global-parameters");
-        if (declarations !== undefined && !Array.isArray(declarations.node)) {
+        const malformed =
+          declarations !== undefined && !Array.isArray(declarations.node);
+        if (malformed) {
           ctx.report({
-            message:
-              "x-fern-global-parameters must be a list of global parameter declarations, each with a name.",
+            message: `x-fern-global-parameters must be a list of global parameter declarations, each with a name. ${typeof declarations.node === "string" ? "Fern ignores this value." : "Fern fails to import the document."}`,
             location: declarations.location,
           });
         } else if (declarations !== undefined) {
@@ -36,8 +37,17 @@ export const validGlobalParameters: RuleDefinition = {
             const entry = resolveChild(ctx, declarations, index);
             const location =
               entry?.location ?? declarations.location.child([index]);
+            if (entry === undefined) {
+              return;
+            }
+            if (entry.node === null) {
+              ctx.report({
+                message: `Global parameter at index ${index} is null; Fern fails to import the document.`,
+                location,
+              });
+              return;
+            }
             if (
-              entry === undefined ||
               !isPlainObject(entry.node) ||
               typeof entry.node.name !== "string"
             ) {
@@ -95,6 +105,9 @@ export const validGlobalParameters: RuleDefinition = {
 
         const declaredList =
           declared.size > 0 ? [...declared.keys()].join(", ") : "(none)";
+        if (malformed) {
+          return;
+        }
         for (const operation of getOperations(ctx, root)) {
           const located = {
             node: operation.node,

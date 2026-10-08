@@ -17,9 +17,3 @@ components:
     AlsoBlank:
       title: "  "
       type: object
-    NumericTitle:
-      title: 1
-      type: object
-    AlsoNumericTitle:
-      title: 1
-      type: object

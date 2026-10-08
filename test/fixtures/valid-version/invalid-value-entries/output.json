@@ -2,13 +2,13 @@
   {
     "ruleId": "fern/valid-version",
     "severity": "error",
-    "message": "x-fern-version values must be strings, or objects with a string `value`.",
+    "message": "x-fern-version values must be strings, or objects with a string `value`. fern check does not catch this, but SDK generation fails.",
     "location": "openapi.yaml#/x-fern-version/values/0"
   },
   {
     "ruleId": "fern/valid-version",
     "severity": "error",
-    "message": "x-fern-version values must be strings, or objects with a string `value`.",
+    "message": "x-fern-version values must be strings, or objects with a string `value`. fern check does not catch this, but SDK generation fails.",
     "location": "openapi.yaml#/x-fern-version/values/1/value"
   }
 ]

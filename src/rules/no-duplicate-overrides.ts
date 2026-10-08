@@ -2,26 +2,29 @@
  * Reports operations that claim an SDK method another operation already claims: the same
  * `x-fern-sdk-group-name` (a string, or an array joined with `.`) and `x-fern-sdk-method-name`,
  * for overlapping `x-fern-audiences` (no audiences means every audience). Operations with
- * `x-fern-ignore: true` are skipped.
+ * `x-fern-ignore: true` are skipped. A group name that is neither a string nor a list of strings is
+ * reported, since Fern fails to import it.
  *
  * Options:
  * - `namespace` (string): the namespace the document is imported under in generators.yml. It is
  *   prepended to the SDK method path in messages.
  */
 import { HTTP_METHODS, rootOf } from "../utils/document.js";
+import { describeValue } from "../utils/extensions.js";
 import { isPlainObject, resolveChild } from "../utils/resolve.js";
 import type { AnyNode, RuleDefinition, UserContext } from "../utils/types.js";
 
 const METHODS = new Set<string>(HTTP_METHODS);
 
-function sdkGroupName(value: unknown): string | undefined {
+/** The SDK group path, or null when the value is malformed (Fern fails to import it). */
+function sdkGroupName(value: unknown): string | null {
   if (typeof value === "string") {
     return value;
   }
   if (Array.isArray(value) && value.every(part => typeof part === "string")) {
     return value.join(".");
   }
-  return undefined;
+  return null;
 }
 
 function audiencesOf(value: unknown): string[] {
@@ -78,16 +81,24 @@ export const noDuplicateOverrides: RuleDefinition = {
             if (node["x-fern-ignore"] === true) {
               continue;
             }
-            const groupName = sdkGroupName(node["x-fern-sdk-group-name"]);
-            const methodName = node["x-fern-sdk-method-name"];
-            if (
-              groupName === undefined ||
-              groupName.length === 0 ||
-              typeof methodName !== "string" ||
-              methodName.length === 0
-            ) {
+            const rawGroupName = node["x-fern-sdk-group-name"];
+            const rawMethodName = node["x-fern-sdk-method-name"];
+            if (rawGroupName === undefined || rawGroupName === null) {
               continue;
             }
+            const groupName = sdkGroupName(rawGroupName);
+            if (groupName === null) {
+              ctx.report({
+                message: `x-fern-sdk-group-name must be a string or a list of strings; got ${describeValue(rawGroupName)}. Fern fails to import the document.`,
+                location: operation.location.child("x-fern-sdk-group-name"),
+              });
+              continue;
+            }
+            if (groupName.length === 0 || !rawMethodName) {
+              continue;
+            }
+            // Fern interpolates the method name into a string, so [list] and 5 still name methods.
+            const methodName = `${rawMethodName}`;
             const audiences = audiencesOf(node["x-fern-audiences"]);
             const key = `${groupName}:${methodName}`;
             const previous = seen.get(key) ?? [];

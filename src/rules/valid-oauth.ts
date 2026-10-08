@@ -18,7 +18,8 @@
  *       responseProperties: { accessToken: $response.access_token, expiresIn: $response.expires_in, refreshToken: $response.refresh_token }
  * ```
  *
- * Endpoints are `METHOD /path` (or an operationId). Unset request and response properties fall
+ * Endpoints are `METHOD /path` with an uppercase method, optionally prefixed with a `namespace::`
+ * (which this rule ignores); Fern does not resolve operationIds. Unset request and response properties fall
  * back to Fern's defaults (`$request.client_id`, `$request.client_secret`,
  * `$response.access_token`, `$request.refresh_token`). Without options the rule does nothing.
  */
@@ -137,19 +138,31 @@ interface EndpointOptions {
   responseProperties?: Record<string, unknown>;
 }
 
+/** Fern's endpoint reference syntax for OpenAPI workspaces: `[namespace::]METHOD /path`. */
+const ENDPOINT_REFERENCE =
+  /^(?:(\w+)::)?(GET|POST|PUT|DELETE|PATCH|HEAD)\s(\/\S*)$/;
+
+type EndpointLookup =
+  | { kind: "found"; operation: OperationInfo }
+  | { kind: "malformed" }
+  | { kind: "missing" };
+
 function findOperation(
   operations: OperationInfo[],
   reference: string,
-): OperationInfo | undefined {
-  const match = /^([A-Za-z]+)\s+(\S+)$/.exec(reference.trim());
-  if (match !== null) {
-    const method = match[1]!.toLowerCase();
-    const path = match[2]!;
-    return operations.find(
-      operation => operation.method === method && operation.path === path,
-    );
+): EndpointLookup {
+  const match = ENDPOINT_REFERENCE.exec(reference);
+  if (match === null) {
+    return { kind: "malformed" };
   }
-  return operations.find(operation => operation.node.operationId === reference);
+  const method = match[2]!.toLowerCase();
+  const path = match[3]!;
+  const operation = operations.find(
+    candidate => candidate.method === method && candidate.path === path,
+  );
+  return operation === undefined
+    ? { kind: "missing" }
+    : { kind: "found", operation };
 }
 
 function checkEndpoint(
@@ -278,7 +291,8 @@ export const validOauth: RuleDefinition = {
             ? ctx.location.child("paths")
             : ctx.location;
         const operations = getOperations(ctx, document).filter(
-          operation => !isIgnored(operation.node),
+          operation =>
+            !isIgnored(operation.node) && !isIgnored(operation.pathItem.node),
         );
 
         const resolve = (
@@ -292,14 +306,18 @@ export const validOauth: RuleDefinition = {
             });
             return undefined;
           }
-          const operation = findOperation(operations, value.endpoint);
-          if (operation === undefined) {
-            ctx.report({
-              message: `Failed to resolve endpoint ${value.endpoint}: the document has no such operation. Use "METHOD /path" as written under paths, or an operationId.`,
-              location: pathsLocation,
-            });
+          const lookup = findOperation(operations, value.endpoint);
+          if (lookup.kind === "found") {
+            return lookup.operation;
           }
-          return operation;
+          ctx.report({
+            message:
+              lookup.kind === "malformed"
+                ? `Failed to resolve endpoint ${value.endpoint}: Fern resolves OAuth endpoints written as "METHOD /path", with an uppercase method and the path as written under paths (operationIds are not resolved).`
+                : `Failed to resolve endpoint ${value.endpoint}: the document has no such operation (operations with x-fern-ignore do not count).`,
+            location: pathsLocation,
+          });
+          return undefined;
         };
 
         if (getToken == null) {

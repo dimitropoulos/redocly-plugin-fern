@@ -18,21 +18,31 @@ components:
           type: string
       allOf:
         - $ref: "#/components/schemas/AliasOfBase"
-        - $ref: "#/components/schemas/AllOfAliasOfBase"
+        - $ref: "#/components/schemas/AllOfAliasOfOtherBase"
         - $ref: "#/components/schemas/ComposedBase"
     Base:
       type: object
       properties:
         id:
           type: string
+    OtherBase:
+      type: object
+      properties:
+        label:
+          type: string
+    ThirdBase:
+      type: object
+      properties:
+        code:
+          type: string
     AliasOfBase:
       $ref: "#/components/schemas/Base"
-    AllOfAliasOfBase:
+    AllOfAliasOfOtherBase:
       allOf:
-        - $ref: "#/components/schemas/Base"
+        - $ref: "#/components/schemas/OtherBase"
     ComposedBase:
       allOf:
-        - $ref: "#/components/schemas/Base"
+        - $ref: "#/components/schemas/ThirdBase"
         - type: object
           properties:
             createdAt:

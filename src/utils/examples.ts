@@ -12,12 +12,15 @@ import type { AnyNode, Located, Location, UserContext } from "./types.js";
 /**
  * Validates example values against OpenAPI schemas with Ajv, the way Redocly's
  * `no-invalid-media-type-examples` does: draft-04 for OAS 3.0 and 2020-12 for OAS 3.1+,
- * `$ref`s resolved through Redocly's resolver, `unevaluatedProperties: false` by default, and
- * `readOnly`/`writeOnly` handled through the request/response API context.
+ * `$ref`s resolved through Redocly's resolver and `unevaluatedProperties: false` by default.
+ * Only structure (types, required and unexpected properties, enums, constants, unions) is
+ * reported; value constraints such as `maximum` or `pattern` are not, matching Fern.
+ *
+ * `readOnly` and `writeOnly` follow Fern's importer: both are accepted in request and response
+ * examples, and a required `readOnly` property is optional (Fern imports it as `optional<T>`).
  */
 
 type Dialect = "2020" | "draft4";
-export type ApiContext = "request" | "response";
 
 type ValidatorContext = Pick<UserContext, "resolve" | "specVersion">;
 
@@ -40,6 +43,27 @@ interface AjvLike {
 }
 
 const COMPOSITE_KEYWORDS = new Set(["oneOf", "anyOf"]);
+
+/**
+ * Value constraints Fern's example check does not enforce (in parameters or bodies, inline or
+ * named): examples that violate them pass `fern check`.
+ */
+const UNCHECKED_KEYWORDS = new Set([
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+  "minLength",
+  "maxLength",
+  "pattern",
+  "format",
+  "minItems",
+  "maxItems",
+  "uniqueItems",
+  "minProperties",
+  "maxProperties",
+]);
 
 function dialectOf(specVersion: UserContext["specVersion"]): Dialect {
   return specVersion === "oas2" || specVersion === "oas3_0" ? "draft4" : "2020";
@@ -121,41 +145,6 @@ function fernMessage(error: ErrorObject, value: unknown): string {
     }
     case "const":
       return `Expected example to be ${describeValue(params.allowedValue)}. Example is: ${describeValue(value)}`;
-    case "minimum":
-    case "exclusiveMinimum":
-    case "maximum":
-    case "exclusiveMaximum": {
-      const comparison = String(params.comparison);
-      const words: Record<string, string> = {
-        ">=": "greater than or equal to",
-        ">": "greater than",
-        "<=": "less than or equal to",
-        "<": "less than",
-      };
-      return `Expected number to be ${words[comparison] ?? comparison} ${params.limit}. Example is ${describeValue(value)}.`;
-    }
-    case "multipleOf":
-      return `Expected number to be a multiple of ${params.multipleOf}. Example is ${describeValue(value)}.`;
-    case "minLength":
-    case "maxLength": {
-      const bound =
-        error.keyword === "minLength"
-          ? "greater than or equal to"
-          : "less than or equal to";
-      const length = typeof value === "string" ? value.length : 0;
-      return `Expected string length to be ${bound} ${params.limit}. Example is ${describeValue(value)}, which is of length ${length}.`;
-    }
-    case "pattern":
-      return `Expected string to match pattern ${params.pattern}. Example is ${describeValue(value)}.`;
-    case "format":
-      return `Expected example to be a valid ${params.format}. Example is: ${describeValue(value)}`;
-    case "minItems":
-    case "maxItems":
-      return `Expected list to have ${error.keyword === "minItems" ? "at least" : "at most"} ${params.limit} items. Example has ${Array.isArray(value) ? value.length : 0}.`;
-    case "uniqueItems":
-      return `Expected list items to be unique. Items ${params.j} and ${params.i} are identical.`;
-    case "readOnly":
-      return "Property is readOnly, so it must not appear in a request example";
     case "oneOf":
       return "Example must match exactly one of the oneOf schemas";
     case "anyOf":
@@ -184,6 +173,83 @@ function pruneBranchErrors(errors: ErrorObject[]): ErrorObject[] {
   );
 }
 
+/** Keys whose values are example data rather than schemas. */
+const DATA_KEYWORDS = new Set([
+  "example",
+  "examples",
+  "enum",
+  "const",
+  "default",
+]);
+
+/** Keys whose values map names to schemas. */
+const SCHEMA_MAP_KEYWORDS = new Set([
+  "properties",
+  "patternProperties",
+  "$defs",
+  "definitions",
+]);
+
+function isReadOnlyProperty(
+  ctx: ValidatorContext,
+  property: AnyNode,
+  base: string,
+): boolean {
+  if (!isPlainObject(property)) {
+    return false;
+  }
+  if (property.readOnly === true) {
+    return true;
+  }
+  if (!isRefNode(property)) {
+    return false;
+  }
+  const resolved: AnyNode = ctx.resolve(property, base).node;
+  return isPlainObject(resolved) && resolved.readOnly === true;
+}
+
+/**
+ * Copies a schema with `readOnly` properties removed from every `required` list, since Fern's
+ * importer makes them optional. `base` is the file the schema lives in, for resolving `$ref`s.
+ */
+function withOptionalReadOnly(
+  ctx: ValidatorContext,
+  node: AnyNode,
+  base: string,
+): AnyNode {
+  if (Array.isArray(node)) {
+    return node.map(item => withOptionalReadOnly(ctx, item, base));
+  }
+  if (!isPlainObject(node)) {
+    return node;
+  }
+  const copy: Record<string, AnyNode> = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (SCHEMA_MAP_KEYWORDS.has(key) && isPlainObject(value)) {
+      copy[key] = Object.fromEntries(
+        Object.entries(value).map(([name, schema]) => [
+          name,
+          withOptionalReadOnly(ctx, schema, base),
+        ]),
+      );
+    } else {
+      copy[key] =
+        DATA_KEYWORDS.has(key) || key.startsWith("x-")
+          ? value
+          : withOptionalReadOnly(ctx, value, base);
+    }
+  }
+  if (Array.isArray(node.required) && isPlainObject(node.properties)) {
+    const properties = node.properties;
+    copy.required = node.required.filter(
+      (key: AnyNode) =>
+        typeof key !== "string" ||
+        !isReadOnlyProperty(ctx, properties[key], base),
+    );
+  }
+  return copy;
+}
+
 export class ExampleValidator {
   private readonly instances: Partial<Record<Dialect, AjvLike>> = {};
   private readonly synthetic = new Map<string, ValidateFunction>();
@@ -203,7 +269,7 @@ export class ExampleValidator {
       validateSchema: false,
       discriminator: true,
       allowUnionTypes: true,
-      validateFormats: true,
+      validateFormats: false,
       passContext: true,
       logger: false,
       loadSchemaSync(base: string, $ref: string, $id: string) {
@@ -214,7 +280,11 @@ export class ExampleValidator {
         }
         return {
           [idKey]: `${encodeURI(resolved.location.source.absoluteRef)}#${$id}`,
-          ...resolved.node,
+          ...withOptionalReadOnly(
+            ctx,
+            resolved.node,
+            resolved.location.source.absoluteRef,
+          ),
         };
       },
     } as Options;
@@ -250,7 +320,13 @@ export class ExampleValidator {
     const id = encodeURI(location.absolutePointer);
     try {
       if (ajv.getSchema(id) === undefined) {
-        ajv.addSchema({ ...node, [schemaIdKey(dialect)]: id }, id);
+        ajv.addSchema(
+          {
+            ...withOptionalReadOnly(ctx, node, location.source.absoluteRef),
+            [schemaIdKey(dialect)]: id,
+          },
+          id,
+        );
       }
       return ajv.getSchema(id);
     } catch {
@@ -286,7 +362,6 @@ export class ExampleValidator {
     ctx: ValidatorContext,
     data: unknown,
     schema: Located | { standalone: Record<string, unknown> },
-    apiContext: ApiContext,
   ): ExampleError[] {
     const validate =
       "standalone" in schema
@@ -298,7 +373,7 @@ export class ExampleValidator {
     let valid: boolean;
     try {
       valid = Boolean(
-        validate.call({ apiContext }, data, {
+        validate.call({}, data, {
           instancePath: "",
           parentData: { fake: {} },
           parentDataProperty: "fake",
@@ -313,7 +388,10 @@ export class ExampleValidator {
       return [];
     }
     const result: ExampleError[] = [];
-    for (const error of pruneBranchErrors(validate.errors ?? [])) {
+    const errors = (validate.errors ?? []).filter(
+      error => !UNCHECKED_KEYWORDS.has(error.keyword),
+    );
+    for (const error of pruneBranchErrors(errors)) {
       const path = decodePointer(error.instancePath);
       const value = valueAt(data, path);
       // Fern treats strings starting with `$` as example references and does not validate them.

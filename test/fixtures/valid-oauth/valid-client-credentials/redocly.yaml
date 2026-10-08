@@ -9,6 +9,6 @@ rules:
         expiresIn: $response.expires_in
         refreshToken: $response.refresh_token
     refreshToken:
-      endpoint: refreshToken
+      endpoint: POST /oauth/refresh
       responseProperties:
         expiresIn: $response.expires_in

@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/no-duplicate-field-names",
+    "severity": "error",
+    "message": "Fern silently drops enum value \"!~\" from the generated SDK: Fern cannot generate a name for it, nor for the earlier value \"^\". Give each value a unique name with x-fern-enum.",
+    "location": "openapi.yaml#/components/schemas/Operator/enum/2"
+  }
+]

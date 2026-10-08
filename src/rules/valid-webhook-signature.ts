@@ -1,7 +1,8 @@
 /**
  * Validates `x-fern-webhook-signature`, the webhook signature verification config. The document
  * root holds the default for every webhook (an object); a webhook operation (under `webhooks`, or
- * with `x-fern-webhook: true`) may override it with an object or inherit it with a boolean.
+ * with `x-fern-webhook: true`) may override it with an object or inherit it with a boolean. The
+ * document-level config is only checked when at least one webhook uses it.
  */
 import { getOperations, operationLabel, rootOf } from "../utils/document.js";
 import { describeValue, isNonEmptyString } from "../utils/extensions.js";
@@ -65,7 +66,7 @@ function validateSignature(
 
   if (isSet(signature.encoding) && !ENCODINGS.includes(signature.encoding)) {
     ctx.report({
-      message: `Invalid encoding ${JSON.stringify(signature.encoding)}. Must be one of: ${oneOf(ENCODINGS)}`,
+      message: `Invalid encoding ${JSON.stringify(signature.encoding)}. Must be one of: ${oneOf(ENCODINGS)}. Fern ignores it and falls back to base64.`,
       location: at("encoding"),
     });
   }
@@ -88,7 +89,7 @@ function validateSignature(
       !HMAC_ALGORITHMS.includes(signature.algorithm)
     ) {
       ctx.report({
-        message: `Invalid HMAC algorithm ${JSON.stringify(signature.algorithm)}. Must be one of: ${oneOf(HMAC_ALGORITHMS)}`,
+        message: `Invalid HMAC algorithm ${JSON.stringify(signature.algorithm)}. Must be one of: ${oneOf(HMAC_ALGORITHMS)}. Fern ignores it and falls back to sha256.`,
         location: at("algorithm"),
       });
     }
@@ -150,18 +151,22 @@ function validateTimestamp(
     !TIMESTAMP_FORMATS.includes(timestamp.format)
   ) {
     ctx.report({
-      message: `Invalid timestamp format ${JSON.stringify(timestamp.format)}. Must be one of: ${oneOf(TIMESTAMP_FORMATS)}`,
+      message: `Invalid timestamp format ${JSON.stringify(timestamp.format)}. Must be one of: ${oneOf(TIMESTAMP_FORMATS)}. Fern ignores it and falls back to unix-seconds.`,
       location: location.child(["format"]),
     });
   }
-  if (
-    isSet(timestamp.tolerance) &&
-    (typeof timestamp.tolerance !== "number" || timestamp.tolerance <= 0)
-  ) {
-    ctx.report({
-      message: `${EXTENSION} timestamp tolerance must be a positive number`,
-      location: location.child(["tolerance"]),
-    });
+  if (isSet(timestamp.tolerance)) {
+    if (typeof timestamp.tolerance !== "number") {
+      ctx.report({
+        message: `${EXTENSION} timestamp tolerance must be a positive number; got ${describeValue(timestamp.tolerance)}. fern check does not catch this, but SDK generation fails.`,
+        location: location.child(["tolerance"]),
+      });
+    } else if (timestamp.tolerance <= 0) {
+      ctx.report({
+        message: `${EXTENSION} timestamp tolerance must be a positive number`,
+        location: location.child(["tolerance"]),
+      });
+    }
   }
 }
 
@@ -172,7 +177,7 @@ function validatePayloadFormat(
 ): void {
   if (!isPlainObject(format) || !Array.isArray(format.components)) {
     ctx.report({
-      message: `${EXTENSION} payload-format must be an object with a list of components (${oneOf(PAYLOAD_COMPONENTS)}).`,
+      message: `${EXTENSION} payload-format must be an object with a list of components (${oneOf(PAYLOAD_COMPONENTS)}). Fern fails to import the document.`,
       location: isPlainObject(format)
         ? location.child(["components"])
         : location,
@@ -182,7 +187,7 @@ function validatePayloadFormat(
   format.components.forEach((component: AnyNode, index: number) => {
     if (!PAYLOAD_COMPONENTS.includes(component)) {
       ctx.report({
-        message: `Invalid payload-format component ${JSON.stringify(component)}. Must be one of: ${oneOf(PAYLOAD_COMPONENTS)}`,
+        message: `Invalid payload-format component ${JSON.stringify(component)}. Must be one of: ${oneOf(PAYLOAD_COMPONENTS)}. Fern replaces it with body, so SDKs sign the body in its place.`,
         location: location.child(["components", index]),
       });
     }
@@ -197,24 +202,19 @@ function validateBodyHashBinding(
   const binding = signature["body-hash-binding"];
   if (!isPlainObject(binding)) {
     ctx.report({
-      message: `${EXTENSION} body-hash-binding must be an object with an algorithm and a location.`,
+      message: `${EXTENSION} body-hash-binding must be an object with an algorithm and a location; Fern ignores ${describeValue(binding)}.`,
       location,
     });
     return;
   }
-  if (isSet(binding.encoding) && !ENCODINGS.includes(binding.encoding)) {
-    ctx.report({
-      message: `Invalid body-hash-binding encoding ${JSON.stringify(binding.encoding)}. Must be one of: ${oneOf(ENCODINGS)}`,
-      location: location.child(["encoding"]),
-    });
-  }
   if (!BODY_HASH_ALGORITHMS.includes(binding.algorithm)) {
     ctx.report({
-      message: `Invalid body-hash-binding algorithm ${isSet(binding.algorithm) ? JSON.stringify(binding.algorithm) : "(missing)"}. Must be one of: ${oneOf(BODY_HASH_ALGORITHMS)}`,
+      message: `Invalid body-hash-binding algorithm ${isSet(binding.algorithm) ? JSON.stringify(binding.algorithm) : "(missing)"}. Must be one of: ${oneOf(BODY_HASH_ALGORITHMS)}. Fern ignores the body-hash-binding.`,
       location: isSet(binding.algorithm)
         ? location.child(["algorithm"])
         : location.child(["algorithm"]).key(),
     });
+    return;
   }
   const bindingLocation = binding.location;
   if (
@@ -231,12 +231,24 @@ function validateBodyHashBinding(
     });
     return;
   }
-  if (!isNonEmptyString(bindingLocation.name)) {
+  if (isSet(binding.encoding) && !ENCODINGS.includes(binding.encoding)) {
     ctx.report({
-      message: "body-hash-binding query-parameter location must specify a name",
+      message: `Invalid body-hash-binding encoding ${JSON.stringify(binding.encoding)}. Must be one of: ${oneOf(ENCODINGS)}. Fern ignores it and falls back to base64.`,
+      location: location.child(["encoding"]),
+    });
+  }
+  if (typeof bindingLocation.name !== "string") {
+    ctx.report({
+      message:
+        "body-hash-binding query-parameter location must specify a name; without one, fern check crashes.",
       location: isSet(bindingLocation.name)
         ? location.child(["location", "name"])
         : location.child(["location", "name"]).key(),
+    });
+  } else if (bindingLocation.name.length === 0) {
+    ctx.report({
+      message: "body-hash-binding query-parameter location must specify a name",
+      location: location.child(["location", "name"]),
     });
   }
   const components = signature["payload-format"]?.components;
@@ -257,7 +269,7 @@ function validateUrlNormalization(
 ): void {
   if (!isPlainObject(normalization)) {
     ctx.report({
-      message: `${EXTENSION} url-normalization must be an object with port-variants and/or legacy-query-encoding.`,
+      message: `${EXTENSION} url-normalization must be an object with port-variants and/or legacy-query-encoding; Fern ignores ${describeValue(normalization)}.`,
       location,
     });
     return;
@@ -279,7 +291,7 @@ function validateUrlNormalization(
   ) {
     ctx.report({
       message:
-        "url-normalization must enable at least one of port-variants or legacy-query-encoding",
+        "url-normalization must enable at least one of port-variants or legacy-query-encoding; Fern ignores it otherwise.",
       location,
     });
   }
@@ -299,29 +311,22 @@ export const validWebhookSignature: RuleDefinition = {
           ? rootNode[EXTENSION]
           : undefined;
         const rootLocation = root.location.child([EXTENSION]);
-        if (isSet(rootSignature)) {
-          if (isPlainObject(rootSignature)) {
-            validateSignature(ctx, rootSignature, rootLocation);
-          } else {
-            ctx.report({
-              message: `The document-level ${EXTENSION} must be an object (the default config for every webhook); Fern ignores ${describeValue(rootSignature)}.`,
-              location: rootLocation,
-            });
-          }
-        }
         const hasRootConfig = isPlainObject(rootSignature);
+        // Webhooks without their own config, or with a boolean, use the document-level config.
+        let rootConfigUsed = false;
 
         for (const operation of getOperations(ctx, root, {
           includeWebhooks: true,
         })) {
           const signature = operation.node[EXTENSION];
-          if (!isSet(signature)) {
-            continue;
-          }
-          const location = operation.location.child([EXTENSION]);
           const isWebhook =
             operation.kind === "webhook" ||
             operation.node["x-fern-webhook"] === true;
+          if (!isSet(signature)) {
+            rootConfigUsed ||= isWebhook;
+            continue;
+          }
+          const location = operation.location.child([EXTENSION]);
           if (!isWebhook) {
             ctx.report({
               message: `${EXTENSION} is ignored on ${operationLabel(operation)}: it only applies to webhooks (operations under \`webhooks\`, or with x-fern-webhook: true).`,
@@ -331,7 +336,12 @@ export const validWebhookSignature: RuleDefinition = {
           }
           if (isPlainObject(signature)) {
             validateSignature(ctx, signature, location);
-          } else if (signature === true && !hasRootConfig) {
+            continue;
+          }
+          if (typeof signature === "boolean") {
+            rootConfigUsed = true;
+          }
+          if (signature === true && !hasRootConfig) {
             ctx.report({
               message: `${EXTENSION}: true inherits the document-level ${EXTENSION}, but the document does not define one, so Fern drops signature verification for this webhook.`,
               location,
@@ -344,8 +354,19 @@ export const validWebhookSignature: RuleDefinition = {
             });
           } else if (typeof signature !== "boolean") {
             ctx.report({
-              message: `${EXTENSION} on a webhook must be an object, or true to inherit the document-level config; got ${describeValue(signature)}.`,
+              message: `${EXTENSION} on a webhook must be an object, or true to inherit the document-level config; got ${describeValue(signature)}. Fern drops signature verification for this webhook.`,
               location,
+            });
+          }
+        }
+
+        if (isSet(rootSignature) && rootConfigUsed) {
+          if (hasRootConfig) {
+            validateSignature(ctx, rootSignature, rootLocation);
+          } else {
+            ctx.report({
+              message: `The document-level ${EXTENSION} must be an object (the default config for every webhook); Fern ignores ${describeValue(rootSignature)}.`,
+              location: rootLocation,
             });
           }
         }

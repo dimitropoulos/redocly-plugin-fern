@@ -10,6 +10,11 @@ paths:
     post:
       operationId: createPet
       x-fern-webhook-signature: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
           description: OK
@@ -18,6 +23,11 @@ paths:
       operationId: petHook
       x-fern-webhook: true
       x-fern-webhook-signature: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
       responses:
         "200":
           description: OK

@@ -16,6 +16,7 @@ import {
   getRequestBody,
 } from "./document.js";
 import { headerSdkName, stringExtension } from "./naming.js";
+import { streamingMode } from "./property-path.js";
 import {
   isPlainObject,
   isRefNode,
@@ -362,7 +363,6 @@ function objectShape(schema: AnyNode): ObjectShape {
   }
   const types = schemaTypes(schema);
   if (
-    types.includes("null") ||
     schema.oneOf !== undefined ||
     schema.anyOf !== undefined ||
     schema.not !== undefined ||
@@ -374,6 +374,13 @@ function objectShape(schema: AnyNode): ObjectShape {
   const hasProperties =
     isPlainObject(schema.properties) &&
     Object.keys(schema.properties).length > 0;
+  if (types.includes("null")) {
+    // A nullable body imports as `nullable<T>`, which is never inlined.
+    return hasProperties &&
+      (nonNullTypes.length === 0 || nonNullTypes.includes("object"))
+      ? "non-object"
+      : "unknown";
+  }
   const allOf = Array.isArray(schema.allOf)
     ? schema.allOf.filter(
         (member: AnyNode) =>
@@ -413,6 +420,29 @@ type BodyMode =
 
 const COMPONENT_SCHEMA_POINTER = /#\/components\/schemas\/[^/]+$/;
 
+/**
+ * The body of a `stream-condition` operation: the importer dereferences the JSON body schema and
+ * inlines it with the condition property added, whether or not the schema is shared.
+ */
+function streamConditionBodyMode(ctx: Ctx, schema: BodySchemaInfo): BodyMode {
+  const target = isRefNode(schema.node)
+    ? ctx.resolve(schema.node, schema.location.source.absoluteRef)
+    : { node: schema.node, location: schema.location };
+  if (
+    target.node === undefined ||
+    target.location === undefined ||
+    isRefNode(target.node)
+  ) {
+    return { mode: "unknown" };
+  }
+  return objectShape(target.node) === "object"
+    ? {
+        mode: "inline",
+        schema: { node: target.node, location: target.location },
+      }
+    : { mode: "unknown" };
+}
+
 /** Whether a JSON/form body is inlined into the request wrapper or exposed as `body`. */
 function bodyMode(
   ctx: Ctx,
@@ -420,6 +450,9 @@ function bodyMode(
   schema: BodySchemaInfo,
   facts: DocumentFacts,
 ): BodyMode {
+  if (streamingMode(operation.node) === "stream-condition") {
+    return streamConditionBodyMode(ctx, schema);
+  }
   if (!isRefNode(schema.node)) {
     const shape = objectShape(schema.node);
     if (shape === "object") {
@@ -462,11 +495,7 @@ function bodyMode(
   ) {
     return { mode: "referenced" };
   }
-  if (
-    requestUsers === 1 &&
-    otherReferences.length === 0 &&
-    operation.node["x-fern-streaming"] === undefined
-  ) {
+  if (requestUsers === 1 && otherReferences.length === 0) {
     return {
       mode: "inline",
       schema: { node: target.node, location: target.location },
@@ -486,6 +515,8 @@ interface BodyProperty {
 interface CollectedBody {
   /** Properties the importer adds as direct (deconflicted) request properties. */
   direct: BodyProperty[];
+  /** Wire keys of direct `readOnly` properties the importer drops from write requests. */
+  droppedReadOnly: Set<string>;
   /** Properties inherited through `allOf` `$ref`s (`extends`), which are not deconflicted. */
   inherited: BodyProperty[];
   /** Every name a body property might get, for path parameter renames. */
@@ -664,6 +695,7 @@ function collectInlineBody(
   const direct: BodyProperty[] = [];
   const inlined: BodyProperty[] = [];
   const inherited: BodyProperty[] = [];
+  const droppedReadOnly = new Set<string>();
   const uncertainKeys = new Set<string>();
   const node = schema.node;
 
@@ -682,7 +714,12 @@ function collectInlineBody(
         },
         [],
       );
-      if (property !== undefined && !(isWrite && property.readOnly)) {
+      if (property === undefined) {
+        continue;
+      }
+      if (isWrite && property.readOnly) {
+        droppedReadOnly.add(key);
+      } else {
         target.push(property);
       }
     }
@@ -786,6 +823,7 @@ function collectInlineBody(
   return {
     direct: [...direct, ...inlined].filter(certain),
     inherited: inherited.filter(certain),
+    droppedReadOnly,
     possibleNames,
   };
 }
@@ -872,6 +910,10 @@ export function documentFacts(
       continue;
     }
     bodyRefSources.add(schema.location.absolutePointer);
+    if (streamingMode(operation.node) === "stream-condition") {
+      // The importer dereferences these bodies, so they do not count as uses of the schema.
+      continue;
+    }
     const pointer = target.location.absolutePointer;
     bodyRefUsers.set(pointer, (bodyRefUsers.get(pointer) ?? 0) + 1);
   }
@@ -897,6 +939,13 @@ export function documentFacts(
 
 export interface RequestWrapper {
   items: WrapperItem[];
+  /**
+   * The names a JSON or form request body takes in the wrapper (its inlined properties, or
+   * `body`), when the importer's choice can be decided; undefined otherwise.
+   */
+  bodyNames: Set<string> | undefined;
+  /** Wire keys of `readOnly` properties the importer drops from an inlined request body. */
+  droppedReadOnlyKeys: Set<string>;
   /** Path parameters with their SDK name (after automatic renames), when certain. */
   pathParameterNames: { parameter: ParameterInfo; name: string | undefined }[];
 }
@@ -932,7 +981,12 @@ export function buildRequestWrapper(
     parameter => !facts.globalHeaders.has(parameter.name),
   );
 
+  let bodyNames: Set<string> | undefined;
+  let droppedReadOnlyKeys = new Set<string>();
   const body = requestBodyKind(ctx, operation);
+  if (body.kind === "none") {
+    bodyNames = new Set();
+  }
   let headersInWrapper = body.kind !== "octet" && body.kind !== "unknown";
   let referencedBody = false;
   let possibleBodyNames = new Set<string>();
@@ -976,6 +1030,7 @@ export function buildRequestWrapper(
     const mode = bodyMode(ctx, operation, body.schema!, facts);
     if (mode.mode === "referenced") {
       possibleBodyNames.add("body");
+      bodyNames = new Set(["body"]);
       referencedBody =
         pathParameters.length > 0 ||
         queryParameters.length > 0 ||
@@ -989,6 +1044,8 @@ export function buildRequestWrapper(
       directProperties = collected.direct;
       inheritedProperties = collected.inherited;
       possibleBodyNames = collected.possibleNames;
+      bodyNames = collected.possibleNames;
+      droppedReadOnlyKeys = collected.droppedReadOnly;
     } else {
       possibleBodyNames.add("body");
       addPossibleNames(
@@ -1123,5 +1180,5 @@ export function buildRequestWrapper(
     });
   }
 
-  return { items, pathParameterNames };
+  return { items, bodyNames, droppedReadOnlyKeys, pathParameterNames };
 }

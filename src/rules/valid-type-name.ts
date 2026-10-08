@@ -1,14 +1,18 @@
 /**
- * Checks that the type names Fern declares begin with a letter: `x-fern-type-name` values on
- * component and inline schemas, `x-fern-request-name` / `x-request-name` values, and the names
- * Fern generates from `components.schemas` keys. Fern spells out leading numbers (`2fa` becomes
- * `two_Fa`), so generated names only fail for keys made only of symbols, keys starting with a
+ * Checks that the names of the types Fern declares begin with a letter: `x-fern-type-name` values
+ * on component and inline schemas, and the names Fern generates from `components.schemas` keys.
+ * Fern spells out leading numbers (`2fa` becomes `TwoFa`, and numbers above 9999 become
+ * `undefined_`), so generated names only fail for keys made only of symbols, keys that are only a
  * number above 9999 and keys starting with a non-ASCII letter.
+ *
+ * Request names (`x-fern-request-name`, `x-request-name`, the `x-fern-type-name` of an inline
+ * request body and component schemas Fern inlines into a request) are not type declarations, and
+ * Fern does not check them.
  *
  * Redocly's `spec-components-invalid-map-name` only restricts keys to `^[a-zA-Z0-9.\-_]+$`.
  */
-import { getOperations, rootOf } from "../utils/document.js";
-import { requestNameOverride, TYPE_NAME_REGEX } from "../utils/type-names.js";
+import { rootOf } from "../utils/document.js";
+import { TYPE_NAME_REGEX } from "../utils/type-names.js";
 import {
   collectDeclarations,
   isInlineTypeDeclaration,
@@ -27,10 +31,7 @@ function message(declaration: Declaration): string | undefined {
     case "schema-key":
       return `Type name must begin with a letter: Fern generates the type name ${name} from the components.schemas key "${declaration.schemaKey}". Add x-fern-type-name with a name that begins with a letter.`;
     case "x-fern-type-name":
-    case "request-body-type-name":
       return `Type name must begin with a letter, but x-fern-type-name is ${name}.`;
-    case "request-body-schema":
-      return `Type name must begin with a letter: ${declaration.description} is named ${name}. Rename it with x-fern-request-name on the operation.`;
     default:
       return undefined;
   }
@@ -50,28 +51,16 @@ export const validTypeName: RuleDefinition = {
           rootRef = ctx.location.source.absoluteRef;
         },
         leave(root: AnyNode, ctx: UserContext) {
-          const located = rootOf(root, ctx);
-          for (const operation of getOperations(ctx, located, {
-            includeWebhooks: true,
-          })) {
-            const override = requestNameOverride(operation.node);
-            if (
-              override !== undefined &&
-              !TYPE_NAME_REGEX.test(override.name)
-            ) {
-              ctx.report({
-                message: `Type name must begin with a letter, but ${override.extension} is "${override.name}".`,
-                location: operation.location.child(override.extension),
-              });
-            }
-          }
           const { declarations } = collectDeclarations(
             ctx,
-            located,
+            rootOf(root, ctx),
             inlineTypes,
           );
           for (const declaration of declarations) {
-            if (TYPE_NAME_REGEX.test(declaration.name)) {
+            if (
+              declaration.kind !== "type" ||
+              TYPE_NAME_REGEX.test(declaration.name)
+            ) {
               continue;
             }
             const text = message(declaration);

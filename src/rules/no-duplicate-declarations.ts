@@ -5,6 +5,14 @@
  * body schema's `x-fern-type-name`, or the name generated from the SDK method name or operationId)
  * and error names (one per 4xx/5xx status code).
  *
+ * Most collisions make `fern check` fail. Two types with the same name in the same Fern definition
+ * file do not: Fern keeps only one of them and silently drops the other, so references to the
+ * dropped schema end up pointing at a different one. Both are reported as errors.
+ *
+ * Fern inlines a component used as a JSON request body into the request (and names the request
+ * after it) only when no other operation or schema references the component. Operations with an
+ * `x-fern-streaming` stream-condition become two endpoints whose requests are named separately.
+ *
  * Collisions Fern resolves on its own are not reported: component keys equal to an error name are
  * renamed with a `Body` suffix, and generated request names that clash with a component schema get
  * a `Body` suffix. Duplicate operationIds are covered by Redocly's `operation-operationId-unique`.
@@ -33,6 +41,11 @@ interface Options {
 
 function renameHint(declaration: Declaration, other: Declaration): string {
   const target = declaration.kind === "error" ? other : declaration;
+  if (target.source === "stream-condition") {
+    return target === declaration
+      ? "Name the two requests with x-fern-request-name on the operation and stream-request-name in x-fern-streaming."
+      : `Name the requests of ${target.subject.replace(/^the (non-)?streaming request of /, "")} with x-fern-request-name on the operation and stream-request-name in x-fern-streaming.`;
+  }
   switch (target.kind) {
     case "request":
       return target === declaration
@@ -106,8 +119,21 @@ export const noDuplicateDeclarations: RuleDefinition = {
               if (isAutoResolved(declaration, first, options)) {
                 continue;
               }
+              const overwritten =
+                declaration.kind === "type" &&
+                first.kind === "type" &&
+                declaration.file !== undefined &&
+                declaration.file === first.file;
+              const consequence = overwritten
+                ? `Both become Fern types named "${declaration.name}" in the same file, so Fern keeps only one of them and silently drops the other; references to the dropped schema point to the one Fern keeps.`
+                : `fern check fails with "${declaration.name} is already declared".`;
+              const streamNote =
+                declaration.source === "stream-condition" ||
+                first.source === "stream-condition"
+                  ? " Fern splits an operation with an x-fern-streaming stream-condition into a streaming and a non-streaming endpoint, each with its own request."
+                  : "";
               ctx.report({
-                message: `${capitalize(declaration.description)} is named "${declaration.name}", which is already declared by ${first.description} at ${describeLocation(first.location, rootRef)}. ${renameHint(declaration, first)}`,
+                message: `${capitalize(declaration.description)} is named "${declaration.name}", which is already declared by ${first.description} at ${describeLocation(first.location, rootRef)}. ${consequence}${streamNote} ${renameHint(declaration, first)}`,
                 location: declaration.location,
               });
             }

@@ -111,6 +111,8 @@ export type NameSource =
   | "request-body-schema"
   /** Generated from the SDK method name, operationId or method and path. */
   | "generated"
+  /** One of the two requests of an operation with an `x-fern-streaming` stream-condition. */
+  | "stream-condition"
   | "error";
 
 export interface Declaration {
@@ -119,6 +121,11 @@ export interface Declaration {
   source: NameSource;
   /** The directory of the Fern definition file the name is declared in. */
   scope: string;
+  /**
+   * The Fern definition file (without extension) a type is declared in, when known. Fern keeps
+   * only the last of several types with the same name in one file.
+   */
+  file?: string;
   /** Names the declaration for messages, e.g. `the schema components.schemas.Plant`. */
   subject: string;
   /** {@link subject} plus how Fern arrived at the name. */
@@ -217,11 +224,13 @@ function groupNameOf(value: AnyNode): string[] | undefined {
   return undefined;
 }
 
+const PACKAGE_FILE = "__package__";
+
 /**
- * The directory of the Fern definition file for an SDK group name, mirroring
- * `convertSdkGroupNameToFile`. Names in the same directory share one namespace.
+ * The Fern definition file (without extension) for an SDK group name, mirroring
+ * `convertSdkGroupNameToFile`.
  */
-function scopeOf(groupName: string[], namespace: string | undefined): string {
+function fileOf(groupName: string[], namespace: string | undefined): string {
   const segments: string[] = [];
   if (namespace !== undefined) {
     segments.push(
@@ -230,15 +239,44 @@ function scopeOf(groupName: string[], namespace: string | undefined): string {
         : namespace,
     );
     if (groupName.length === 0) {
-      segments.push("__package__");
+      segments.push(PACKAGE_FILE);
     }
   }
   segments.push(...groupName.map(camelCasePreservingUnderscores));
-  if (segments.length === 0) {
-    return ".";
+  return segments.length === 0 ? PACKAGE_FILE : segments.join("/");
+}
+
+/** The directory of a Fern definition file. Names in the same directory share one namespace. */
+function directoryOf(file: string): string {
+  const index = file.lastIndexOf("/");
+  return index === -1 ? "." : file.slice(0, index);
+}
+
+/** The directory of the Fern definition file for an SDK group name. */
+function scopeOf(groupName: string[], namespace: string | undefined): string {
+  return directoryOf(fileOf(groupName, namespace));
+}
+
+/**
+ * The file Fern puts an endpoint in, mirroring `getEndpointLocation`: the SDK group of
+ * `x-fern-sdk-method-name`, else the first tag, else the root package.
+ */
+function endpointFileOf(operation: AnyNode): string {
+  const sdkMethod = sdkMethodOf(operation);
+  if (sdkMethod !== undefined) {
+    return fileOf(sdkMethod.groupName, undefined);
   }
-  segments.pop();
-  return segments.length === 0 ? "." : segments.join("/");
+  const tag = Array.isArray(operation.tags) ? operation.tags[0] : undefined;
+  if (typeof tag !== "string") {
+    return PACKAGE_FILE;
+  }
+  if (
+    typeof operation.operationId === "string" &&
+    camelCase(operation.operationId) === camelCase(tag)
+  ) {
+    return PACKAGE_FILE;
+  }
+  return camelCase(tag);
 }
 
 interface ComponentInfo {
@@ -248,6 +286,7 @@ interface ComponentInfo {
   entryLocation: Location;
   ignored: boolean;
   scope: string;
+  file: string;
   name: string;
   source: NameSource;
   nameLocation: Location;
@@ -281,10 +320,11 @@ function componentInfos(ctx: Ctx, root: Located): ComponentInfo[] {
           : undefined,
       ) ??
       [];
-    const scope = scopeOf(
+    const file = fileOf(
       groupName,
       stringExtension(schema, "x-fern-sdk-namespace"),
     );
+    const scope = directoryOf(file);
     const typeName = stringExtension(schema, "x-fern-type-name");
     let name: string;
     let source: NameSource;
@@ -308,6 +348,7 @@ function componentInfos(ctx: Ctx, root: Located): ComponentInfo[] {
       entryLocation,
       ignored,
       scope,
+      file,
       name,
       source,
       nameLocation,
@@ -404,16 +445,82 @@ function globalHeaderNames(root: AnyNode): Set<string> {
 }
 
 function isSkippedOperation(operation: AnyNode): boolean {
-  if (operation["x-fern-ignore"] === true) {
-    return true;
-  }
-  if (operation["x-fern-async-config"] !== undefined) {
-    return true;
-  }
-  const streaming = operation["x-fern-streaming"];
   return (
-    isPlainObject(streaming) && streaming["stream-condition"] !== undefined
+    operation["x-fern-ignore"] === true ||
+    operation["x-fern-async-config"] !== undefined
   );
+}
+
+/** `x-fern-streaming` when it has a `stream-condition`: Fern splits such operations in two. */
+function streamConditionOf(
+  operation: AnyNode,
+): Record<string, AnyNode> | undefined {
+  const streaming = operation["x-fern-streaming"];
+  return isPlainObject(streaming) && streaming["stream-condition"] !== undefined
+    ? streaming
+    : undefined;
+}
+
+interface RequestBodyMedia {
+  requestBody: Located;
+  json?: Located;
+  multipart?: Located;
+}
+
+/** The request body media type Fern converts: JSON (or form-urlencoded), else multipart. */
+function requestBodyMediaOf(
+  ctx: Ctx,
+  operation: OperationInfo,
+): RequestBodyMedia | undefined {
+  if (operation.method === "get") {
+    return undefined;
+  }
+  const requestBody = resolveChild(
+    ctx,
+    { node: operation.node, location: operation.location },
+    "requestBody",
+  );
+  if (requestBody === undefined) {
+    return undefined;
+  }
+  const json =
+    getJsonMediaType(ctx, requestBody) ??
+    getMediaType(ctx, requestBody, "application/x-www-form-urlencoded");
+  const multipart =
+    json === undefined
+      ? getMediaType(ctx, requestBody, "multipart/form-data")
+      : undefined;
+  return { requestBody, json, multipart };
+}
+
+/**
+ * The key Fern's bundler gives a schema `$ref`'d from another file (`./schemas.yaml#/Chat` or
+ * `./api.yaml#/components/schemas/Chat`), or undefined for local and whole-file references.
+ */
+function externalSchemaKey(
+  schema: Located,
+  rootRef: string,
+): string | undefined {
+  if (!isRefNode(schema.node)) {
+    return undefined;
+  }
+  const ref = schema.node.$ref;
+  const hash = ref.indexOf("#");
+  if (
+    hash === -1 ||
+    (hash === 0 && schema.location.source.absoluteRef === rootRef)
+  ) {
+    return undefined;
+  }
+  const match = /^\/(?:components\/schemas\/)?([^/]+)$/.exec(
+    ref.slice(hash + 1),
+  );
+  return match === null ? undefined : unescapePointerSegment(match[1]!);
+}
+
+/** The component key of a schema that is a local `$ref` to `components.schemas`. */
+function componentKeyOf(schema: Located | undefined): string | undefined {
+  return isRefNode(schema?.node) ? localSchemaKey(schema.node.$ref) : undefined;
 }
 
 export interface DeclarationIndex {
@@ -444,20 +551,47 @@ export function collectDeclarations(
   const globalHeaders = globalHeaderNames(root.node);
   const excludedComponents = new Set<string>();
   const requests: Declaration[] = [];
+  const rootRef = root.location.source.absoluteRef;
+  /** External schemas of stream-condition request bodies, which Fern still declares as types. */
+  const bundledTypes: Declaration[] = [];
+  const externalTypes = new Set<string>();
   const errors = new Map<string, Declaration>();
   const operationScopes = new Map<string, string>();
+  const operationFiles = new Map<string, { scope: string; file: string }>();
 
-  const isOnlyUsedAsRequestBody = (key: string): boolean =>
-    (refIndex.get(key) ?? []).every(isRequestBodySchemaPointer);
+  const operations = getOperations(ctx, root).filter(
+    operation => !isSkippedOperation(operation.node),
+  );
 
-  for (const operation of getOperations(ctx, root)) {
-    if (isSkippedOperation(operation.node)) {
+  // Fern inlines a component used as a JSON request body into the request, unless the component
+  // is also referenced elsewhere or is the request body of more than one operation. Operations
+  // with a stream-condition copy the body schema instead of referencing it.
+  const requestBodyUses = new Map<string, number>();
+  for (const operation of operations) {
+    if (streamConditionOf(operation.node) !== undefined) {
       continue;
     }
+    const media = requestBodyMediaOf(ctx, operation);
+    const key = componentKeyOf(
+      media?.json === undefined ? undefined : schemaOfMediaType(media.json),
+    );
+    if (key !== undefined) {
+      requestBodyUses.set(key, (requestBodyUses.get(key) ?? 0) + 1);
+    }
+  }
+  const isInlinedRequestBody = (key: string): boolean =>
+    requestBodyUses.get(key) === 1 &&
+    (refIndex.get(key) ?? []).every(isRequestBodySchemaPointer);
+
+  for (const operation of operations) {
     const sdkMethod = sdkMethodOf(operation.node);
     const scope =
       sdkMethod === undefined ? "." : scopeOf(sdkMethod.groupName, undefined);
     operationScopes.set(operation.location.absolutePointer, scope);
+    operationFiles.set(operation.location.absolutePointer, {
+      scope,
+      file: endpointFileOf(operation.node),
+    });
     const label = operationLabel(operation);
     const override = requestNameOverride(operation.node);
 
@@ -518,29 +652,109 @@ export function collectDeclarations(
         ),
       );
 
-    const requestBody =
-      operation.method === "get"
-        ? undefined
-        : resolveChild(
-            ctx,
-            { node: operation.node, location: operation.location },
-            "requestBody",
-          );
-    const json =
-      requestBody === undefined
-        ? undefined
-        : (getJsonMediaType(ctx, requestBody) ??
-          getMediaType(ctx, requestBody, "application/x-www-form-urlencoded"));
-    const multipart =
-      requestBody === undefined || json !== undefined
-        ? undefined
-        : getMediaType(ctx, requestBody, "multipart/form-data");
+    const media = requestBodyMediaOf(ctx, operation);
+    const requestBody = media?.requestBody;
+    const json = media?.json;
+    const multipart = media?.multipart;
+    const streamCondition = streamConditionOf(operation.node);
 
-    if (json !== undefined) {
+    if (streamCondition !== undefined) {
+      const schema = json === undefined ? undefined : schemaOfMediaType(json);
+      if (schema !== undefined && isObjectSchema(ctx, schema)) {
+        const resolved = resolveNode(ctx, schema.node, schema.location);
+        const typeName = stringExtension(resolved?.node, "x-fern-type-name");
+        const streamRequestName = stringExtension(
+          streamCondition,
+          "stream-request-name",
+        );
+        const addStreamRequest = (
+          streaming: boolean,
+          name: string,
+          location: Location,
+          how: string,
+        ): void => {
+          requests.push({
+            name,
+            kind: "request",
+            source: "stream-condition",
+            scope,
+            ...describe(
+              `the ${streaming ? "streaming" : "non-streaming"} request of ${label}`,
+              how,
+            ),
+            location,
+          });
+        };
+        const addNamed = (streaming: boolean, breadcrumbs: string[]): void => {
+          if (override !== undefined) {
+            addStreamRequest(
+              streaming,
+              override.name,
+              operation.location.child(override.extension),
+              `named by its ${override.extension}`,
+            );
+          } else if (typeName !== undefined) {
+            addStreamRequest(
+              streaming,
+              typeName,
+              operation.location.child("x-fern-streaming").key(),
+              "named by the x-fern-type-name of its request body schema",
+            );
+          } else {
+            addStreamRequest(
+              streaming,
+              getGeneratedTypeName(breadcrumbs),
+              base.location,
+              `name generated from ${base.from}`,
+            );
+          }
+        };
+        const external = externalSchemaKey(schema, rootRef);
+        if (
+          external !== undefined &&
+          typeName === undefined &&
+          !componentsByKey.has(external) &&
+          !externalTypes.has(external)
+        ) {
+          externalTypes.add(external);
+          bundledTypes.push({
+            name: typeNameForSchemaKey(external),
+            kind: "type",
+            source: "schema-key",
+            scope: ".",
+            file: PACKAGE_FILE,
+            ...describe(
+              `the schema ${describeLocation(resolved?.location ?? schema.location, rootRef)}`,
+              "which Fern copies into components.schemas when it bundles the document",
+            ),
+            location: resolved?.location ?? schema.location,
+          });
+        }
+        addNamed(false, [...base.breadcrumbs, "Request"]);
+        if (streamRequestName !== undefined) {
+          addStreamRequest(
+            true,
+            streamRequestName,
+            operation.location.child([
+              "x-fern-streaming",
+              "stream-request-name",
+            ]),
+            "named by its x-fern-streaming stream-request-name",
+          );
+        } else if (isRefNode(schema.node) && typeName !== undefined) {
+          addStreamRequest(
+            true,
+            `${typeName}Streaming`,
+            operation.location.child("x-fern-streaming").key(),
+            "named after the x-fern-type-name of its request body schema",
+          );
+        } else {
+          addNamed(true, [...base.breadcrumbs, "stream", "Request"]);
+        }
+      }
+    } else if (json !== undefined) {
       const schema = schemaOfMediaType(json);
-      const componentKey = isRefNode(schema?.node)
-        ? localSchemaKey(schema.node.$ref)
-        : undefined;
+      const componentKey = componentKeyOf(schema);
       const component =
         componentKey === undefined
           ? undefined
@@ -548,7 +762,7 @@ export function collectDeclarations(
       if (component !== undefined && schema !== undefined) {
         if (
           isObjectSchema(ctx, schema) &&
-          isOnlyUsedAsRequestBody(component.key)
+          isInlinedRequestBody(component.key)
         ) {
           excludedComponents.add(component.key);
           addRequestWithOverride(() =>
@@ -587,9 +801,7 @@ export function collectDeclarations(
       }
     } else if (multipart !== undefined) {
       const schema = schemaOfMediaType(multipart);
-      const componentKey = isRefNode(schema?.node)
-        ? localSchemaKey(schema.node.$ref)
-        : undefined;
+      const componentKey = componentKeyOf(schema);
       if (
         componentKey !== undefined &&
         schema !== undefined &&
@@ -658,13 +870,14 @@ export function collectDeclarations(
       kind: "type",
       source: component.source,
       scope: component.scope,
+      file: component.file,
       ...describeComponent(component),
       location: component.nameLocation,
       schemaKey: component.key,
     });
   }
 
-  const rootRef = root.location.source.absoluteRef;
+  declarations.push(...bundledTypes);
   const componentTargets = new Set(
     components.flatMap(info =>
       info.resolved === undefined
@@ -681,6 +894,7 @@ export function collectDeclarations(
       continue;
     }
     let scope = ".";
+    let file: string | undefined;
     const pointer = inline.location.pointer;
     if (inline.location.source.absoluteRef === rootRef) {
       const componentMatch = /^#\/components\/schemas\/([^/]+)\//.exec(pointer);
@@ -692,12 +906,14 @@ export function collectDeclarations(
           continue;
         }
         scope = component?.scope ?? ".";
+        file = component?.file;
       } else {
-        for (const [operationPointer, operationScope] of operationScopes) {
+        for (const [operationPointer, operation] of operationFiles) {
           if (
             inline.location.absolutePointer.startsWith(`${operationPointer}/`)
           ) {
-            scope = operationScope;
+            scope = operation.scope;
+            file = operation.file;
             break;
           }
         }
@@ -708,6 +924,7 @@ export function collectDeclarations(
       kind: "type",
       source: "x-fern-type-name",
       scope,
+      file,
       ...describe(
         `the inline schema at ${describeLocation(inline.location, rootRef)}`,
         "named by its x-fern-type-name",

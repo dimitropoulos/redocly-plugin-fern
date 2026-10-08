@@ -2,19 +2,19 @@
   {
     "ruleId": "fern/no-missing-auth",
     "severity": "error",
-    "message": "Operation requires auth, but no auth is defined: Fern does not support any of the security schemes in its `security`: digest (http digest), mtls (mutualTLS). Fern supports apiKey in a header, http bearer, http basic, oauth2 and openIdConnect security schemes.",
+    "message": "Operation requires auth, but no auth is defined: its `security` is not empty, but Fern skips every security scheme in `components.securitySchemes`: queryKey (apiKey in query), digest (http digest), mtls (mutualTLS), brokenOauth (oauth2 without flows). Define a security scheme Fern supports (apiKey in a header, http bearer, http basic, oauth2 or openIdConnect), or use `security: []` for operations without auth.",
     "location": "openapi.yaml#/paths/~1digest/get/security (key)"
   },
   {
     "ruleId": "fern/no-missing-auth",
     "severity": "error",
-    "message": "Operation requires auth, but no auth is defined: Fern does not support any of the security schemes in its `security`: brokenOauth (oauth2 without flows). Fern supports apiKey in a header, http bearer, http basic, oauth2 and openIdConnect security schemes.",
+    "message": "Operation requires auth, but no auth is defined: its `security` is not empty, but Fern skips every security scheme in `components.securitySchemes`: queryKey (apiKey in query), digest (http digest), mtls (mutualTLS), brokenOauth (oauth2 without flows). Define a security scheme Fern supports (apiKey in a header, http bearer, http basic, oauth2 or openIdConnect), or use `security: []` for operations without auth.",
     "location": "openapi.yaml#/paths/~1oauth-without-flows/get/security (key)"
   },
   {
     "ruleId": "fern/no-missing-auth",
     "severity": "error",
-    "message": "Operation requires auth, but no auth is defined: Fern does not support any of the security schemes in its `security`: queryKey (apiKey in query). Fern supports apiKey in a header, http bearer, http basic, oauth2 and openIdConnect security schemes.",
+    "message": "Operation requires auth, but no auth is defined: its `security` is not empty, but Fern skips every security scheme in `components.securitySchemes`: queryKey (apiKey in query), digest (http digest), mtls (mutualTLS), brokenOauth (oauth2 without flows). Define a security scheme Fern supports (apiKey in a header, http bearer, http basic, oauth2 or openIdConnect), or use `security: []` for operations without auth.",
     "location": "openapi.yaml#/paths/~1query-key/get/security (key)"
   }
 ]

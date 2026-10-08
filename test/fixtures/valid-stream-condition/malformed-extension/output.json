@@ -2,30 +2,30 @@
   {
     "ruleId": "fern/valid-stream-condition",
     "severity": "error",
-    "message": "x-fern-streaming must be true or an object.",
+    "message": "x-fern-streaming must be true or an object. Fern ignores any other value, so endpoint stringExtension does not stream.",
     "location": "openapi.yaml#/paths/~1chat/post/x-fern-streaming"
   },
   {
     "ruleId": "fern/valid-stream-condition",
     "severity": "error",
-    "message": "x-fern-streaming format must be 'sse' or 'json'.",
+    "message": "x-fern-streaming format must be 'sse' or 'json'. Fern ignores x-fern-streaming with another format, so endpoint badFormat does not stream.",
     "location": "openapi.yaml#/paths/~1chat~1format/post/x-fern-streaming/format"
   },
   {
     "ruleId": "fern/valid-stream-condition",
     "severity": "error",
-    "message": "x-fern-streaming resumable must be a boolean.",
+    "message": "x-fern-streaming resumable must be a boolean. Fern treats any other value as false.",
     "location": "openapi.yaml#/paths/~1chat~1format/post/x-fern-streaming/resumable"
   },
   {
     "ruleId": "fern/valid-stream-condition",
-    "severity": "error",
+    "severity": "warn",
     "message": "x-fern-streaming stream-description must be a string.",
     "location": "openapi.yaml#/paths/~1chat~1format/post/x-fern-streaming/stream-description"
   },
   {
     "ruleId": "fern/valid-stream-condition",
-    "severity": "error",
+    "severity": "warn",
     "message": "x-fern-streaming terminator must be a string.",
     "location": "openapi.yaml#/paths/~1chat~1format/post/x-fern-streaming/terminator"
   },

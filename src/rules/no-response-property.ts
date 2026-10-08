@@ -1,16 +1,13 @@
 /**
  * Validates `x-fern-sdk-return-value` on operations: the SDK returns that top-level property of
  * the JSON success response instead of the whole response, so the response must be an object that
- * declares the property.
+ * declares the property. On streaming endpoints (`x-fern-streaming` without `stream-condition`) and
+ * endpoints without a JSON success response Fern drops the extension.
  */
 import {
   endpointId,
-  getJsonMediaType,
-  getMediaType,
   getOperations,
-  getSuccessResponse,
   rootOf,
-  schemaOfMediaType,
   type OperationInfo,
 } from "../utils/document.js";
 import {
@@ -36,6 +33,7 @@ const EXTENSION = "x-fern-sdk-return-value";
 
 type Target =
   | { kind: "schema"; schema: Located | undefined }
+  | { kind: "untyped" }
   | { kind: "ignored"; reason: string };
 
 /** The schema whose property the SDK returns, following Fern's importer. */
@@ -54,31 +52,25 @@ function targetSchema(ctx: UserContext, operation: OperationInfo): Target {
             ]),
           },
         }
-      : {
-          kind: "ignored",
-          reason:
-            "its x-fern-streaming stream-condition has no response schema",
-        };
+      : { kind: "untyped" };
   }
   if (mode === "stream") {
-    if (isPlainObject(streaming) && streaming.format === "sse") {
-      return {
-        kind: "ignored",
-        reason: "it streams server-sent events (x-fern-streaming format: sse)",
-      };
-    }
-    const response = getSuccessResponse(ctx, operation);
-    const media =
-      getMediaType(ctx, response, "text/event-stream") ??
-      getJsonMediaType(ctx, response);
-    return media === undefined
-      ? { kind: "ignored", reason: "its success response has no JSON content" }
-      : { kind: "schema", schema: schemaOfMediaType(media) };
+    const format =
+      isPlainObject(streaming) && streaming.format === "sse"
+        ? "server-sent events (x-fern-streaming format: sse)"
+        : "JSON (x-fern-streaming)";
+    return {
+      kind: "ignored",
+      reason: `it streams ${format}, and Fern only applies it to non-streaming JSON responses`,
+    };
   }
   const response = getFernResponse(ctx, operation);
   return response.kind === "json"
     ? { kind: "schema", schema: response.schema }
-    : { kind: "ignored", reason: describeMissingResponse(response.reason) };
+    : {
+        kind: "ignored",
+        reason: `${describeMissingResponse(response.reason)}, and Fern only applies it to JSON responses`,
+      };
 }
 
 /** Whether Fern imports the schema as a map rather than an object with properties. */
@@ -122,7 +114,14 @@ export const noResponseProperty: RuleDefinition = {
           const target = targetSchema(ctx, operation);
           if (target.kind === "ignored") {
             ctx.report({
-              message: `${EXTENSION} has no effect on endpoint ${endpointId(operation)}: ${target.reason}, and Fern only applies it to JSON responses.`,
+              message: `${EXTENSION} has no effect on endpoint ${endpointId(operation)}: ${target.reason}.`,
+              location,
+            });
+            continue;
+          }
+          if (target.kind === "untyped") {
+            ctx.report({
+              message: `Response must be an object in order to return a property as a response: endpoint ${endpointId(operation)} has an x-fern-streaming stream-condition without a response schema, so Fern imports its non-streaming response as an untyped value and ${EXTENSION} cannot select a property from it.`,
               location,
             });
             continue;

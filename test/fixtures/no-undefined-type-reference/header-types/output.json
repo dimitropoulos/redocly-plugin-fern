@@ -8,7 +8,7 @@
   {
     "ruleId": "fern/no-undefined-type-reference",
     "severity": "error",
-    "message": "x-fern-global-headers type must be a string in Fern's type syntax (for example optional<list<string>>); got 5.",
+    "message": "x-fern-global-headers type 'map<Tag, string>' uses 'Tag' as a map key, but map keys must be primitive types; Fern ignores this type and falls back to string.",
     "location": "openapi.yaml#/x-fern-global-headers/1/type"
   },
   {

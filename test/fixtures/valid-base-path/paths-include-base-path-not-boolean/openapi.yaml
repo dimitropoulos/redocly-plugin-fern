@@ -6,7 +6,7 @@ x-fern-base-path:
   path: /v1
   paths-include-base-path: "true"
 paths:
-  /pets:
+  /v1/pets:
     get:
       operationId: listPets
       responses:

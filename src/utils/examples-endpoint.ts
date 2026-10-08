@@ -6,6 +6,12 @@ import {
   resolveNode,
 } from "./resolve.js";
 import { collectProperties, isObjectSchema, schemaTypes } from "./schema.js";
+import {
+  buildRequestWrapper,
+  documentFacts,
+  type RefOccurrence,
+  type RequestWrapper,
+} from "./naming-request-wrapper.js";
 import type { AnyNode, Located, UserContext } from "./types.js";
 
 /**
@@ -42,7 +48,7 @@ export type RequestModel =
   | { kind: "none" }
   | { kind: "other" }
   | {
-      kind: "json" | "form";
+      kind: "json" | "form" | "multipart";
       schema: Located | undefined;
       required: boolean;
       mediaType: string;
@@ -59,7 +65,19 @@ export type ResponseModel =
       /** Set when a 204 response sits next to the body response, so the body may be omitted. */
       optional: boolean;
     }
-  | { kind: "stream"; format: "json" | "sse"; schema: Located | undefined };
+  | { kind: "stream"; format: "json" | "sse"; schema: Located | undefined }
+  | {
+      /**
+       * A `stream-condition` operation: Fern generates a streaming endpoint (examples with
+       * `response.stream`) and a non-streaming one (other examples; examples without a response
+       * apply to both), selected by a boolean request body property.
+       */
+      kind: "condition";
+      property: string;
+      response: Located | undefined;
+      stream: Located | undefined;
+      format: "json" | "sse";
+    };
 
 export interface ErrorModel {
   name: string;
@@ -75,6 +93,8 @@ export interface EndpointModel {
   /** Parameters Fern drops from the endpoint, keyed by kind and example key, with the reason. */
   dropped: Record<ParameterKind, Map<string, string>>;
   request: RequestModel;
+  /** Wire keys of `readOnly` properties Fern drops from the inlined request body. */
+  droppedReadOnlyKeys: Set<string>;
   response: ResponseModel;
   errors: Map<string, ErrorModel>;
 }
@@ -505,7 +525,15 @@ function requestModel(
     };
   }
   if (multipartHasSchema) {
-    return { model: { kind: "other" }, media: multipart };
+    return {
+      model: {
+        kind: "multipart",
+        schema: schemaOf(multipart!),
+        required,
+        mediaType: multipartKey!,
+      },
+      media: multipart,
+    };
   }
   if (
     json !== undefined &&
@@ -664,10 +692,35 @@ function convertResponse(
   return undefined;
 }
 
+function conditionModel(operation: OperationInfo): ResponseModel {
+  const streaming = operation.node["x-fern-streaming"];
+  const condition = streaming["stream-condition"];
+  if (typeof condition !== "string") {
+    return { kind: "skip" };
+  }
+  const property = condition.startsWith("$request.")
+    ? condition.slice("$request.".length)
+    : condition;
+  const located = (key: string): Located | undefined =>
+    streaming[key] == null
+      ? undefined
+      : {
+          node: streaming[key],
+          location: operation.location.child(["x-fern-streaming", key]),
+        };
+  return {
+    kind: "condition",
+    property,
+    response: located("response"),
+    stream: located("response-stream"),
+    format: streaming.format === "sse" ? "sse" : "json",
+  };
+}
+
 function responseModel(ctx: Ctx, operation: OperationInfo): ResponseModel {
   const format = streamFormat(ctx, operation);
   if (format === "condition") {
-    return { kind: "skip" };
+    return conditionModel(operation);
   }
   const responses = resolveChild(
     ctx,
@@ -814,7 +867,7 @@ function requestPropertyNames(
     });
   const objectLike =
     isObjectSchema(ctx, schema) && !isNullableSchema(ctx, schema);
-  if (request.kind === "other") {
+  if (request.kind === "multipart") {
     if (!isRefNode(schema.node) && objectLike) {
       propertyNames().forEach(name => certain.add(name));
     }
@@ -901,17 +954,18 @@ function intermediateEndpoint(
 function resolvePathParameterKeys(
   ctx: Ctx,
   endpoint: IntermediateEndpoint,
+  wrapper: RequestWrapper | undefined,
 ): ParameterDeclaration[] {
   const reserved = new Set<string>();
   endpoint.query.forEach(declaration => reserved.add(declaration.key));
   endpoint.headers.forEach(({ declaration, nameOverride }) =>
     reserved.add(nameOverride ?? declaration.key),
   );
-  const body = requestPropertyNames(
-    ctx,
-    endpoint.request,
-    endpoint.requestMedia,
-  );
+  const kind = endpoint.request.kind;
+  const body =
+    wrapper?.bodyNames !== undefined && (kind === "json" || kind === "form")
+      ? { certain: wrapper.bodyNames, ambiguous: new Set<string>() }
+      : requestPropertyNames(ctx, endpoint.request, endpoint.requestMedia);
   body.certain.forEach(name => reserved.add(name));
   const pathNames = endpoint.path.map(({ parameter }) => {
     const override = parameter.node["x-fern-parameter-name"];
@@ -947,8 +1001,18 @@ function resolvePathParameterKeys(
   });
 }
 
-/** The endpoints Fern builds from the document's operations (excluding `x-fern-ignore`d ones). */
-export function buildEndpointModels(ctx: Ctx, root: Located): EndpointModel[] {
+/**
+ * The endpoints Fern builds from the document's operations (excluding `x-fern-ignore`d ones).
+ * With the document's `$ref` occurrences, request bodies are classified as inlined or
+ * referenced the way Fern's importer does, which decides path parameter renames and dropped
+ * `readOnly` body properties.
+ */
+export function buildEndpointModels(
+  ctx: Ctx,
+  root: Located,
+  refs?: RefOccurrence[],
+): EndpointModel[] {
+  const facts = refs === undefined ? undefined : documentFacts(ctx, root, refs);
   const operations = getOperations(ctx, root).filter(
     operation =>
       !isIgnored(operation.node) && !isIgnored(operation.pathItem.node),
@@ -984,6 +1048,20 @@ export function buildEndpointModels(ctx: Ctx, root: Located): EndpointModel[] {
   const detected: ParameterDeclaration[] = [];
   for (const [name, { count, first, operation }] of counts) {
     if (predefinedNames.has(name)) {
+      continue;
+    }
+    if (
+      count >= intermediates.length * GLOBAL_HEADER_THRESHOLD &&
+      first.literal === undefined &&
+      first.schema !== undefined &&
+      isRefNode(first.schema.node)
+    ) {
+      const { schema: _schema, ...rest } = first;
+      detected.push({
+        ...rest,
+        required: true,
+        origin: `Fern makes it a global header because ${count === intermediates.length ? "every operation declares it" : "at least 75% of operations declare it"}; its schema is a $ref, and Fern's example check cannot resolve schema references of global headers, so it treats the header as required`,
+      });
       continue;
     }
     if (count === intermediates.length) {
@@ -1052,15 +1130,20 @@ export function buildEndpointModels(ctx: Ctx, root: Located): EndpointModel[] {
       }
       return header;
     });
+    const wrapper =
+      facts === undefined
+        ? undefined
+        : buildRequestWrapper(ctx, endpoint.operation, facts);
     return {
       operation: endpoint.operation,
       parameters: {
         header: [...headers, ...endpointHeaders],
-        "path parameter": resolvePathParameterKeys(ctx, endpoint),
+        "path parameter": resolvePathParameterKeys(ctx, endpoint, wrapper),
         "query parameter": endpoint.query,
       },
       dropped: endpoint.dropped,
       request: endpoint.request,
+      droppedReadOnlyKeys: wrapper?.droppedReadOnlyKeys ?? new Set(),
       response: responseModel(ctx, endpoint.operation),
       errors,
     };

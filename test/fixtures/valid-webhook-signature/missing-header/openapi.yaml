@@ -21,3 +21,14 @@ webhooks:
       responses:
         "200":
           description: OK
+  petCreated:
+    post:
+      operationId: petCreated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK

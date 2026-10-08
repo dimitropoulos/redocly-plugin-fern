@@ -46,5 +46,11 @@
     "severity": "error",
     "message": "Example is missing required path parameter \"plantId\"",
     "location": "openapi.yaml#/paths/~1gardens~1{gardenId}~1plants~1{plantId}/get/x-fern-examples/3/path-parameters (key)"
+  },
+  {
+    "ruleId": "fern/valid-example-endpoint-call",
+    "severity": "error",
+    "message": "Invalid path parameter \"plantId\" example: Expected example to be a string. Example is: null",
+    "location": "openapi.yaml#/paths/~1gardens~1{gardenId}~1plants~1{plantId}/get/x-fern-examples/3/path-parameters/plantId"
   }
 ]

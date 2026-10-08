@@ -80,21 +80,21 @@ export const validServiceUrls: RuleDefinition = {
             const known =
               urlIds.has(name) || (name === BASE_URL_ID && environments);
             if (!known) {
-              const choices = [
-                ...(environments ? [BASE_URL_ID] : []),
-                ...urlIds.keys(),
-              ];
               const hint = topLevelNames.has(name)
                 ? ` '${name}' names a top-level server, and top-level servers become environments rather than base URLs.`
                 : "";
+              const problem = `x-fern-server-name '${name}' on ${operationLabel(operation)} does not name a base URL: no operation- or path-level server with a url has x-fern-server-name '${name}'.${hint}`;
+              // With named base URLs, Fern keeps the name on the endpoint; otherwise it drops it.
               ctx.report({
-                message: [
-                  `URL '${name}' in x-fern-server-name on ${operationLabel(operation)} is not recognized: no operation- or path-level server with a url has x-fern-server-name '${name}'.${hint}`,
-                  choices.length > 0
-                    ? "Specify one of the configured base URLs:"
-                    : "No named base URLs are configured.",
-                  ...choices.map(choice => `  - ${choice}`),
-                ].join("\n"),
+                message:
+                  environments && urlIds.size > 0
+                    ? [
+                        `${problem} fern check does not catch this, but the generated SDK sends the operation to a base URL that no environment defines. Use one of the configured base URLs:`,
+                        ...[BASE_URL_ID, ...urlIds.keys()].map(
+                          choice => `  - ${choice}`,
+                        ),
+                      ].join("\n")
+                    : `${problem} Fern ignores it, and the operation uses the default base URL.`,
                 location: serverName.location,
               });
             }
@@ -111,10 +111,11 @@ export const validServiceUrls: RuleDefinition = {
             }
             continue;
           }
-          const users =
+          const subject =
             ownServers === undefined
-              ? `the operations of path '${operation.path}' fall`
-              : `${operationLabel(operation)} falls`;
+              ? `the operations of path '${operation.path}'`
+              : operationLabel(operation);
+          const falls = ownServers === undefined ? "fall" : "falls";
           for (const server of servers) {
             if (server.url === undefined) {
               continue;
@@ -125,7 +126,9 @@ export const validServiceUrls: RuleDefinition = {
                 once(server.location.absolutePointer)
               ) {
                 ctx.report({
-                  message: `Server '${server.url}' has no x-fern-server-name, so Fern ignores it and ${users} back to the default base URL. Operation- and path-level servers must be named to be added to the environments.`,
+                  message: environments
+                    ? `Server '${server.url}' has no x-fern-server-name, so Fern ignores it and ${subject} ${falls} back to the default base URL. Operation- and path-level servers must be named to be added to the environments.`
+                    : `Server '${server.url}' has no x-fern-server-name, so Fern ignores it. The document has no top-level \`servers\` either, so the SDK has no URL for ${subject} and callers must pass a base URL. Add top-level servers and name operation- and path-level servers with x-fern-server-name.`,
                   location: server.location,
                 });
               }

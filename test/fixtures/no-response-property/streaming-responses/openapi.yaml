@@ -5,7 +5,7 @@ info:
 paths:
   /a:
     post:
-      operationId: jsonStreamValid
+      operationId: jsonStreamExistingProperty
       x-fern-sdk-return-value: data
       x-fern-streaming: true
       responses:

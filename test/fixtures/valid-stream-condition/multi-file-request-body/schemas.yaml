@@ -2,8 +2,8 @@ ChatRequestBody:
   content:
     application/json:
       schema:
-        $ref: "#/ChatRequest"
-ChatRequest:
+        $ref: "#/ChatBody"
+ChatBody:
   type: object
   properties:
     stream:

@@ -169,16 +169,22 @@ function checkEnum(
   if (fernEnum === undefined) {
     return;
   }
-  const kept = new Map<string, string>();
+  const kept = new Map<string, { value: string; name: string }>();
   for (const value of fernEnum.values) {
     const key = value.name.toLowerCase();
     const first = kept.get(key);
     if (first === undefined) {
-      kept.set(key, value.value);
+      kept.set(key, { value: value.value, name: value.name });
       continue;
     }
+    const clash =
+      value.name === ""
+        ? `Fern cannot generate a name for it, nor for the earlier value "${first.value}"`
+        : value.name === first.name
+          ? `its name "${value.name}" is also the name of the earlier value "${first.value}"`
+          : `its name "${value.name}" matches the name "${first.name}" of the earlier value "${first.value}" when compared case-insensitively`;
     ctx.report({
-      message: `Name "${value.name}" is used by multiple enum values: "${first}" and "${value.value}" (Fern compares enum names case-insensitively). Fern keeps "${first}" and drops "${value.value}". Give each value a unique name with x-fern-enum.`,
+      message: `Fern silently drops enum value "${value.value}" from the generated SDK: ${clash}. Give each value a unique name with x-fern-enum.`,
       location: value.overrideIsValid
         ? value.override!.location
         : value.location,

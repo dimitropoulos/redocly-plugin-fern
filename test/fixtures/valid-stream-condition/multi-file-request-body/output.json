@@ -1,8 +1,8 @@
 [
   {
     "ruleId": "fern/valid-stream-condition",
-    "severity": "error",
+    "severity": "warn",
     "message": "Property \"$request.stream\" must be a boolean to be used as a stream-condition. Fern replaces it with a boolean in the generated request types.",
-    "location": "schemas.yaml#/ChatRequest/properties/stream"
+    "location": "schemas.yaml#/ChatBody/properties/stream"
   }
 ]

@@ -28,10 +28,12 @@ export const noUndefinedVariableReference: RuleDefinition = {
         if (variables !== undefined && !isPlainObject(variables.node)) {
           ctx.report({
             message:
-              "x-fern-sdk-variables must be an object mapping variable names to schemas with type: string.",
+              "x-fern-sdk-variables must be an object mapping variable names to schemas with type: string. Fern fails to import the document.",
             location: variables.location,
           });
-        } else if (variables !== undefined) {
+          return;
+        }
+        if (variables !== undefined) {
           for (const name of Object.keys(variables.node)) {
             declared.add(name);
             const schema = resolveChild(ctx, variables, name);
@@ -81,19 +83,23 @@ export const noUndefinedVariableReference: RuleDefinition = {
             if (reference === undefined || reference.node === null) {
               continue;
             }
-            if (typeof reference.node !== "string") {
-              ctx.report({
-                message: `x-fern-sdk-variable must be the name of a variable declared in x-fern-sdk-variables; got ${describeValue(reference.node)}.`,
-                location: reference.location,
-              });
-              continue;
-            }
             if (parameter.in !== "path") {
               ctx.report({
                 message: `x-fern-sdk-variable is ignored on the in: ${parameter.in} parameter '${parameter.name}'; Fern only supports SDK variables on path parameters.`,
                 location: reference.location,
                 forceSeverity: "warn",
               });
+              continue;
+            }
+            if (typeof reference.node !== "string") {
+              // Fern interpolates the value into `$<value>`, so ['appId'] still names appId.
+              const coerced = `${reference.node}`;
+              if (!declared.has(coerced)) {
+                ctx.report({
+                  message: `x-fern-sdk-variable must be the name of a variable declared in x-fern-sdk-variables; got ${describeValue(reference.node)}, which Fern reads as the undefined variable $${coerced}.`,
+                  location: reference.location,
+                });
+              }
               continue;
             }
             const name = reference.node;

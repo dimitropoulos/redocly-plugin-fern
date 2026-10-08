@@ -11,7 +11,7 @@ webhooks:
         type: hmac
         header: X-Signature
         payload-format:
-          components: [body]
+          components: [notification-url, body]
         body-hash-binding:
           algorithm: md5
           encoding: base32
@@ -32,7 +32,10 @@ webhooks:
       x-fern-webhook-signature:
         type: hmac
         header: X-Signature
+        payload-format:
+          components: [notification-url, body]
         body-hash-binding:
+          algorithm: sha256
           location:
             type: header
             name: X-Body-Hash
@@ -54,6 +57,43 @@ webhooks:
           components: [notification-url, body]
         body-hash-binding:
           algorithm: sha256
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+  d:
+    post:
+      operationId: d
+      x-fern-webhook-signature:
+        type: hmac
+        header: X-Signature
+        payload-format:
+          components: [body]
+        body-hash-binding:
+          algorithm: sha256
+          encoding: base32
+          location:
+            type: query-parameter
+            name: ""
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+  e:
+    post:
+      operationId: e
+      x-fern-webhook-signature:
+        type: hmac
+        header: X-Signature
+        body-hash-binding: sha256
       requestBody:
         content:
           application/json:

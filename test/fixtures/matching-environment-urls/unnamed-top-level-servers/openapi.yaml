@@ -6,4 +6,5 @@ servers:
   - url: https://api.example.com
   - url: https://api.example.com
   - url: https://staging.example.com
+    description: Staging
 paths: {}

@@ -61,12 +61,6 @@ export const builtInRules: Record<string, BuiltInRule> = {
     recommended: true,
     fernRules: ["fern-definition/valid-example-type"],
   },
-  "security-defined": {
-    severity: "error",
-    // Also requires every operation to declare security, which Fern does not.
-    recommended: false,
-    fernRules: ["fern-definition/no-missing-auth"],
-  },
   "operation-operationId-unique": {
     severity: "error",
     recommended: true,

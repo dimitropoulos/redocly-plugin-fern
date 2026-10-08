@@ -8,12 +8,6 @@
   {
     "ruleId": "fern/valid-example-endpoint-call",
     "severity": "error",
-    "message": "Invalid header \"X-Request-Id\" example: Expected string to match pattern ^req-[0-9]+$. Example is \"request-1\".",
-    "location": "openapi.yaml#/paths/~1plants~1{plantId}/get/x-fern-examples/1/headers/X-Request-Id"
-  },
-  {
-    "ruleId": "fern/valid-example-endpoint-call",
-    "severity": "error",
     "message": "Invalid path parameter \"plantId\" example: Expected example to be an integer. Example is: \"7\"",
     "location": "openapi.yaml#/paths/~1plants~1{plantId}/get/x-fern-examples/1/path-parameters/plantId"
   },
@@ -22,12 +16,6 @@
     "severity": "error",
     "message": "Invalid query parameter \"ids\" example: Expected example to be an integer. Example is: \"two\"",
     "location": "openapi.yaml#/paths/~1plants~1{plantId}/get/x-fern-examples/1/query-parameters/ids/1"
-  },
-  {
-    "ruleId": "fern/valid-example-endpoint-call",
-    "severity": "error",
-    "message": "Invalid query parameter \"limit\" example: Expected number to be less than or equal to 100. Example is 500.",
-    "location": "openapi.yaml#/paths/~1plants~1{plantId}/get/x-fern-examples/1/query-parameters/limit"
   },
   {
     "ruleId": "fern/valid-example-endpoint-call",

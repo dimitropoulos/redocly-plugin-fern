@@ -5,10 +5,10 @@ info:
 x-fern-sdk-variables:
   appId:
     type: string
-    description: The application id.
-    x-fern-env: APP_ID
+  region:
+    type: string
 paths:
-  /apps/{appId}/users:
+  /apps/{appId}/regions/{region}/users:
     get:
       operationId: listUsers
       parameters:
@@ -17,7 +17,13 @@ paths:
           required: true
           schema:
             type: string
-          x-fern-sdk-variable: [appId]
+          x-fern-sdk-variable: 5
+        - name: region
+          in: path
+          required: true
+          schema:
+            type: string
+          x-fern-sdk-variable: [appId, region]
       responses:
         "200":
           description: OK

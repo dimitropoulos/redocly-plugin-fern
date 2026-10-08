@@ -2,6 +2,12 @@
   {
     "ruleId": "fern/valid-example-endpoint-call",
     "severity": "error",
+    "message": "Example is missing response.body for NotFoundError; Fern declares NotFoundError with a body schema from the 404 response of another operation.",
+    "location": "openapi.yaml#/paths/~1plants/get/x-fern-examples/0/response"
+  },
+  {
+    "ruleId": "fern/valid-example-endpoint-call",
+    "severity": "error",
     "message": "\"NotFoundError\" is not an error this operation declares. Fern names errors after their status codes (for example 404 becomes NotFoundError); this operation declares no error responses (status codes 400-599, 4XX or 5XX).",
     "location": "openapi.yaml#/paths/~1plants/get/x-fern-examples/0/response/error"
   },

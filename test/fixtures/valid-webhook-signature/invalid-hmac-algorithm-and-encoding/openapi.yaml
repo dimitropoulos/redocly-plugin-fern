@@ -8,3 +8,31 @@ x-fern-webhook-signature:
   algorithm: md5
   encoding: base32
 paths: {}
+webhooks:
+  petCreated:
+    post:
+      operationId: petCreated
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+  petUpdated:
+    post:
+      operationId: petUpdated
+      x-fern-webhook-signature:
+        type: asymmetric
+        header: X-Signature
+        asymmetric-algorithm: ed25519
+        encoding: base32
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK

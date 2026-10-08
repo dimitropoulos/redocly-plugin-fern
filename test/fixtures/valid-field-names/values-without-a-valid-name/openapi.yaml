@@ -8,7 +8,7 @@ components:
   schemas:
     Symbols:
       type: [string, "null"]
-      enum: ["$$", "12345abc", "日本", null, "%%"]
+      enum: ["$$", "12345abc", "日本", null, "%%", "10000", "42"]
       x-fern-enum:
         "%%":
           name: Percent

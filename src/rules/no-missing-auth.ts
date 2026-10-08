@@ -1,12 +1,18 @@
 /**
- * Reports `security` requirements that Fern cannot honor because none of the security schemes
- * they name are types Fern imports. Fern imports `apiKey` in a header, `http` bearer and basic,
- * `oauth2` and `openIdConnect`; other schemes (`apiKey` in a query or cookie, `mutualTLS`, other
- * `http` schemes) are skipped, so the endpoint requires auth but no auth is defined for it.
+ * Reports operations that require auth when Fern defines no auth for the API.
  *
- * The root `security` is reported once, when at least one operation inherits it. An empty
- * requirement (`{}`) makes auth optional and is never reported. Scheme names that are not
- * defined in `components.securitySchemes` are reported by Redocly's `security-defined`.
+ * Fern defines the API's auth from `components.securitySchemes`: it is defined as soon as one
+ * scheme has a type Fern imports (`apiKey` in a header, `http` bearer or basic, `oauth2` with
+ * `flows`, `openIdConnect`), whether or not any `security` requirement names it. Other schemes
+ * (`apiKey` in a query or cookie, `mutualTLS`, other `http` schemes) are skipped.
+ *
+ * An operation requires auth when its effective `security` (its own, or the root `security` it
+ * inherits) is a non-empty array, including `[{}]`; only `security: []` (or no `security`
+ * anywhere) means no auth. Operations with their own `security` are reported at it; the root
+ * `security` is reported once when at least one operation inherits it.
+ *
+ * Auth configured in generators.yml (`auth`, `auth-schemes`) replaces the document's schemes;
+ * disable this rule for such APIs.
  */
 import { getOperations, rootOf } from "../utils/document.js";
 import { isPlainObject, resolveChild } from "../utils/resolve.js";
@@ -18,80 +24,54 @@ import type {
   UserContext,
 } from "../utils/types.js";
 
-/** Why Fern skips a security scheme, or undefined when Fern supports it. */
-function unsupportedReason(scheme: AnyNode): string | undefined {
+/** Whether Fern's importer turns a security scheme into an auth scheme. */
+function isSupportedScheme(scheme: AnyNode): boolean {
+  if (!isPlainObject(scheme)) {
+    return false;
+  }
+  switch (scheme.type) {
+    case "apiKey":
+      return scheme.in === "header";
+    case "http": {
+      const httpScheme =
+        typeof scheme.scheme === "string" ? scheme.scheme.toLowerCase() : "";
+      return httpScheme === "bearer" || httpScheme === "basic";
+    }
+    case "openIdConnect":
+      return true;
+    case "oauth2":
+      return isPlainObject(scheme.flows);
+    default:
+      return false;
+  }
+}
+
+/** Describes a security scheme Fern skips, for messages. */
+function unsupportedReason(scheme: AnyNode): string {
   if (!isPlainObject(scheme)) {
     return "not a security scheme object";
   }
   const type = scheme.type;
   if (type === "apiKey") {
-    return scheme.in === "header"
-      ? undefined
-      : `apiKey in ${typeof scheme.in === "string" ? scheme.in : "an unknown location"}`;
+    return `apiKey in ${typeof scheme.in === "string" ? scheme.in : "an unknown location"}`;
   }
   if (type === "http") {
     const httpScheme =
       typeof scheme.scheme === "string" ? scheme.scheme.toLowerCase() : "";
-    return httpScheme === "bearer" || httpScheme === "basic"
-      ? undefined
-      : `http ${httpScheme === "" ? "without a scheme" : httpScheme}`;
-  }
-  if (type === "openIdConnect") {
-    return undefined;
+    return `http ${httpScheme === "" ? "without a scheme" : httpScheme}`;
   }
   if (type === "oauth2") {
-    return scheme.flows == null ? "oauth2 without flows" : undefined;
+    return "oauth2 without flows";
   }
   return typeof type === "string" ? type : "a scheme without a type";
 }
 
-interface Verdict {
-  /** Names and reasons of the unsupported schemes, when no requirement is usable. */
-  unsupported: string[];
-}
-
-/**
- * Checks a `security` array. Returns undefined when Fern can authenticate (or auth is optional,
- * absent, or only names undefined schemes).
- */
-function checkSecurity(
-  security: AnyNode,
-  schemes: Record<string, string | undefined>,
-): Verdict | undefined {
-  if (!Array.isArray(security) || security.length === 0) {
-    return undefined;
-  }
-  const unsupported: string[] = [];
-  for (const requirement of security) {
-    if (!isPlainObject(requirement)) {
-      continue;
-    }
-    const names = Object.keys(requirement);
-    if (names.length === 0) {
-      return undefined;
-    }
-    for (const name of names) {
-      if (!(name in schemes)) {
-        continue;
-      }
-      const reason = schemes[name];
-      if (reason === undefined) {
-        return undefined;
-      }
-      const description = `${name} (${reason})`;
-      if (!unsupported.includes(description)) {
-        unsupported.push(description);
-      }
-    }
-  }
-  return unsupported.length === 0 ? undefined : { unsupported };
-}
-
+/** The security schemes in `components.securitySchemes`, resolved. */
 function securitySchemes(
   ctx: UserContext,
   root: Located,
-): Record<string, string | undefined> {
-  const result: Record<string, string | undefined> = {};
+): Record<string, AnyNode> {
+  const result: Record<string, AnyNode> = {};
   const components = resolveChild(ctx, root, "components");
   const schemes =
     components === undefined
@@ -101,49 +81,69 @@ function securitySchemes(
     return result;
   }
   for (const name of Object.keys(schemes.node)) {
-    result[name] = unsupportedReason(resolveChild(ctx, schemes, name)?.node);
+    result[name] = resolveChild(ctx, schemes, name)?.node;
   }
   return result;
 }
 
-const SUPPORTED =
-  "Fern supports apiKey in a header, http bearer, http basic, oauth2 and openIdConnect security schemes.";
+/** Whether a `security` value makes Fern require auth: any non-empty array. */
+function requiresAuth(security: AnyNode): boolean {
+  return (
+    Array.isArray(security) &&
+    security.some(requirement => isPlainObject(requirement))
+  );
+}
+
+function explanation(schemes: Record<string, AnyNode>): string {
+  const names = Object.keys(schemes);
+  const defined =
+    names.length === 0
+      ? "`components.securitySchemes` defines no security schemes"
+      : `Fern skips every security scheme in \`components.securitySchemes\`: ${names
+          .map(name => `${name} (${unsupportedReason(schemes[name])})`)
+          .join(", ")}`;
+  return `${defined}. Define a security scheme Fern supports (apiKey in a header, http bearer, http basic, oauth2 or openIdConnect), or use \`security: []\` for operations without auth.`;
+}
 
 export const noMissingAuth: RuleDefinition = {
   name: "no-missing-auth",
   fernRules: ["fern-definition/no-missing-auth"],
   severity: "error",
   description:
-    "Operations that require auth must use security schemes Fern supports.",
+    "Operations that require auth need a security scheme Fern supports.",
   rule: () => ({
     Root: {
       leave(root: AnyNode, ctx: UserContext) {
         const document = rootOf(root, ctx);
         const schemes = securitySchemes(ctx, document);
+        if (Object.values(schemes).some(isSupportedScheme)) {
+          return;
+        }
+        const reason = explanation(schemes);
         let inheritsRootSecurity = false;
         for (const operation of getOperations(ctx, document)) {
           if (!isFernEndpoint(operation)) {
             continue;
           }
-          if (operation.node.security === undefined) {
+          const security = operation.node.security;
+          if (security === undefined || security === null) {
             inheritsRootSecurity = true;
             continue;
           }
-          const verdict = checkSecurity(operation.node.security, schemes);
-          if (verdict !== undefined) {
+          if (requiresAuth(security)) {
             ctx.report({
-              message: `Operation requires auth, but no auth is defined: Fern does not support any of the security schemes in its \`security\`: ${verdict.unsupported.join(", ")}. ${SUPPORTED}`,
+              message: `Operation requires auth, but no auth is defined: its \`security\` is not empty, but ${reason}`,
               location: operation.location.child("security").key(),
             });
           }
         }
-        if (!inheritsRootSecurity || !isPlainObject(root)) {
-          return;
-        }
-        const verdict = checkSecurity(root.security, schemes);
-        if (verdict !== undefined) {
+        if (
+          inheritsRootSecurity &&
+          isPlainObject(root) &&
+          requiresAuth(root.security)
+        ) {
           ctx.report({
-            message: `The root \`security\` requires auth, but no auth is defined: Fern does not support any of its security schemes: ${verdict.unsupported.join(", ")}. ${SUPPORTED}`,
+            message: `Operations without their own \`security\` require auth, but no auth is defined: the root \`security\` is not empty, but ${reason}`,
             location: ctx.location.child("security").key(),
           });
         }

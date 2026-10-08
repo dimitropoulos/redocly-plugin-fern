@@ -40,5 +40,11 @@
     "severity": "error",
     "message": "Invalid request example at \"/soil\": Unexpected property \"texture\"",
     "location": "openapi.yaml#/paths/~1plants/post/x-fern-examples/2/request/soil/texture (key)"
+  },
+  {
+    "ruleId": "fern/valid-example-endpoint-call",
+    "severity": "error",
+    "message": "Invalid request example: Unexpected property \"file\"; Fern's example check does not accept file parts (format: binary) of multipart request bodies, so leave them out of examples",
+    "location": "openapi.yaml#/paths/~1plants~1upload/post/x-fern-examples/0/request/file (key)"
   }
 ]

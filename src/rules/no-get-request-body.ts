@@ -1,3 +1,15 @@
+/**
+ * Reports request bodies on GET and HEAD operations.
+ *
+ * - GET: Fern's importer drops the request body, so the generated SDK never sends it.
+ * - HEAD: Fern keeps the request body (JSON, multipart, form-urlencoded or binary content) and
+ *   its validator then rejects the endpoint. Bodies with only other media types are dropped
+ *   before validation and are not reported.
+ *
+ * Operations Fern does not import (`x-fern-ignore: true`, webhooks) are skipped.
+ */
+import { getOperations, rootOf } from "../utils/document.js";
+import { fernRequestMediaTypes, isFernEndpoint } from "../utils/structure.js";
 import type { AnyNode, RuleDefinition, UserContext } from "../utils/types.js";
 
 export const noGetRequestBody: RuleDefinition = {
@@ -6,17 +18,33 @@ export const noGetRequestBody: RuleDefinition = {
   severity: "error",
   description: "GET and HEAD operations cannot have a request body.",
   rule: () => ({
-    Operation(operation: AnyNode, ctx: UserContext) {
-      const method = String(ctx.key).toUpperCase();
-      if (
-        (method === "GET" || method === "HEAD") &&
-        operation.requestBody !== undefined
-      ) {
-        ctx.report({
-          message: `Operation is a ${method}, so it cannot have a request body.`,
-          location: ctx.location.child("requestBody").key(),
-        });
-      }
+    Root: {
+      leave(root: AnyNode, ctx: UserContext) {
+        for (const operation of getOperations(ctx, rootOf(root, ctx))) {
+          if (
+            !isFernEndpoint(operation) ||
+            operation.node.requestBody === undefined
+          ) {
+            continue;
+          }
+          const location = operation.location.child("requestBody").key();
+          if (operation.method === "get") {
+            ctx.report({
+              message:
+                "Operation is a GET, so it cannot have a request body. Fern ignores the `requestBody` of GET operations, so the generated SDKs never send it.",
+              location,
+            });
+          } else if (
+            operation.method === "head" &&
+            fernRequestMediaTypes(ctx, operation).length > 0
+          ) {
+            ctx.report({
+              message: "Operation is a HEAD, so it cannot have a request body.",
+              location,
+            });
+          }
+        }
+      },
     },
   }),
 };

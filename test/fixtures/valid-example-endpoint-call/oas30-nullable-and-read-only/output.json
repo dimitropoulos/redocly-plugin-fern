@@ -2,12 +2,6 @@
   {
     "ruleId": "fern/valid-example-endpoint-call",
     "severity": "error",
-    "message": "Invalid request example at \"/id\": Property is readOnly, so it must not appear in a request example",
-    "location": "openapi.yaml#/paths/~1plants/post/x-fern-examples/1/request/id"
-  },
-  {
-    "ruleId": "fern/valid-example-endpoint-call",
-    "severity": "error",
     "message": "Invalid request example at \"/name\": Expected example to be a string. Example is: null",
     "location": "openapi.yaml#/paths/~1plants/post/x-fern-examples/2/request/name"
   }

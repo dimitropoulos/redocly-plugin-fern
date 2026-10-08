@@ -52,8 +52,9 @@ export const validBasePath: RuleDefinition = {
         ) {
           ctx.report({
             message:
-              "x-fern-base-path `parameters` must be an object keyed by path parameter name; Fern ignores this value.",
+              "x-fern-base-path `parameters` must be an object keyed by path parameter name; Fern ignores this value and declares the `{placeholders}` of `path` as plain string parameters without docs or defaults.",
             location: basePath.parameters.location,
+            forceSeverity: "warn",
           });
         }
         const include = basePath.pathsIncludeBasePath;
@@ -63,8 +64,7 @@ export const validBasePath: RuleDefinition = {
           typeof include !== "boolean"
         ) {
           ctx.report({
-            message:
-              "x-fern-base-path `paths-include-base-path` must be a boolean; Fern only strips the base path from paths when it is `true`.",
+            message: `x-fern-base-path \`paths-include-base-path\` must be a boolean; Fern treats ${describeValue(include)} as false, so it does not strip the base path from the paths and prepends it to them again (a path that already includes it gets it twice).`,
             location: basePath.value.location.child([
               "paths-include-base-path",
             ]),
@@ -98,8 +98,11 @@ export const validBasePath: RuleDefinition = {
           }
           const rest = key.slice(prefix.length);
           if (rest.length > 0 && !rest.startsWith("/")) {
+            const consequence = prefix.includes("{")
+              ? `produces the path '${rest}', and fern check fails with "Path must start with a slash"`
+              : `prepends the base path again with a slash, so SDKs call '${prefix}/${rest}' instead of '${key}'`;
             ctx.report({
-              message: `Path '${key}' starts with base path '${prefix}' only partway through a segment. Fern strips the prefix anyway and produces the path '${rest}', which has no leading slash.`,
+              message: `Path '${key}' starts with base path '${prefix}' only partway through a segment. Fern strips the prefix anyway and ${consequence}.`,
               location,
             });
           }
