@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/no-duplicate-declarations",
+    "severity": "error",
+    "message": "The request of POST /plants/bulk (named after its request body schema components.schemas.NewPlant, which Fern inlines into the request) is named \"NewPlant\", which is already declared by the request of POST /plants (named after its request body schema components.schemas.NewPlant, which Fern inlines into the request) at #/paths/~1plants/post/requestBody/content/application~1json/schema. Rename this request with x-fern-request-name on the operation.",
+    "location": "openapi.yaml#/paths/~1plants~1bulk/post/requestBody/content/application~1json/schema"
+  }
+]

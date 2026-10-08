@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-stream-condition",
+    "severity": "error",
+    "message": "stream-condition must be specified when both response and response-stream are specified.",
+    "location": "openapi.yaml#/paths/~1chat/post/x-fern-streaming"
+  }
+]

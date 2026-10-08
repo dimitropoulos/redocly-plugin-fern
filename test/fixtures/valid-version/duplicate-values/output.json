@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-version",
+    "severity": "error",
+    "message": "Version \"2024-01-01\" is listed more than once in x-fern-version values.",
+    "location": "openapi.yaml#/x-fern-version/values/1"
+  }
+]

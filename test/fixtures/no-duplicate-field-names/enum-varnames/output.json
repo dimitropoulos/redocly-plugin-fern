@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/no-duplicate-field-names",
+    "severity": "error",
+    "message": "Name \"ok\" is used by multiple enum values: \"ok\" and \"okay\" (Fern compares enum names case-insensitively). Fern keeps \"ok\" and drops \"okay\". Give each value a unique name with x-fern-enum.",
+    "location": "openapi.yaml#/components/schemas/Status/x-enum-varnames/1"
+  }
+]

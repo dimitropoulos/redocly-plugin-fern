@@ -55,8 +55,3 @@ export function resolveChild<T = AnyNode>(
   }
   return resolveNode<T>(ctx, value, parent.location.child([key]));
 }
-
-/** The `$ref` string of a node, if it is a reference. */
-export function refOf(node: AnyNode): string | undefined {
-  return isRefNode(node) ? node.$ref : undefined;
-}

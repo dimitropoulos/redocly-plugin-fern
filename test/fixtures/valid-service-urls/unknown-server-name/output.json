@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-service-urls",
+    "severity": "error",
+    "message": "URL 'Uploads' in x-fern-server-name on PUT /files is not recognized: no operation- or path-level server with a url has x-fern-server-name 'Uploads'.\nSpecify one of the configured base URLs:\n  - Base\n  - Upload",
+    "location": "openapi.yaml#/paths/~1files/put/x-fern-server-name"
+  }
+]

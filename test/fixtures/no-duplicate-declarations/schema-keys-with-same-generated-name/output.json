@@ -1,0 +1,14 @@
+[
+  {
+    "ruleId": "fern/no-duplicate-declarations",
+    "severity": "error",
+    "message": "The schema components.schemas.plant_info is named \"PlantInfo\", which is already declared by the schema components.schemas.PlantInfo at #/components/schemas/PlantInfo. Rename one of them with x-fern-type-name.",
+    "location": "openapi.yaml#/components/schemas/plant_info (key)"
+  },
+  {
+    "ruleId": "fern/no-duplicate-declarations",
+    "severity": "error",
+    "message": "The schema components.schemas.plant-info is named \"PlantInfo\", which is already declared by the schema components.schemas.PlantInfo at #/components/schemas/PlantInfo. Rename one of them with x-fern-type-name.",
+    "location": "openapi.yaml#/components/schemas/plant-info (key)"
+  }
+]

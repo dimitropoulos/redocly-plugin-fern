@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-base-path",
+    "severity": "error",
+    "message": "Path '/v1users' starts with base path '/v1' only partway through a segment. Fern strips the prefix anyway and produces the path 'users', which has no leading slash.",
+    "location": "openapi.yaml#/paths/~1v1users (key)"
+  }
+]

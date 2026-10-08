@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/no-component-schema-collisions",
+    "severity": "warn",
+    "message": "The apis option of fern/no-component-schema-collisions must be a list of file paths.",
+    "location": "openapi.yaml#/"
+  }
+]

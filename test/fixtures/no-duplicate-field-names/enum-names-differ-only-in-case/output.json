@@ -1,0 +1,14 @@
+[
+  {
+    "ruleId": "fern/no-duplicate-field-names",
+    "severity": "error",
+    "message": "Name \"active\" is used by multiple enum values: \"Active\" and \"active\" (Fern compares enum names case-insensitively). Fern keeps \"Active\" and drops \"active\". Give each value a unique name with x-fern-enum.",
+    "location": "openapi.yaml#/components/schemas/Status/enum/1"
+  },
+  {
+    "ruleId": "fern/no-duplicate-field-names",
+    "severity": "error",
+    "message": "Name \"ACTIVE\" is used by multiple enum values: \"Active\" and \"ACTIVE\" (Fern compares enum names case-insensitively). Fern keeps \"Active\" and drops \"ACTIVE\". Give each value a unique name with x-fern-enum.",
+    "location": "openapi.yaml#/components/schemas/Status/enum/2"
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/matching-environment-urls",
+    "severity": "error",
+    "message": "Top-level server 'https://staging.example.com' has no x-fern-server-name, so Fern skips it: once any top-level server is named, only named servers become environments.",
+    "location": "openapi.yaml#/servers/2"
+  }
+]

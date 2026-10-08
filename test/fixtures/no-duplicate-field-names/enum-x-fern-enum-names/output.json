@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/no-duplicate-field-names",
+    "severity": "error",
+    "message": "Name \"on\" is used by multiple enum values: \"active\" and \"enabled\" (Fern compares enum names case-insensitively). Fern keeps \"active\" and drops \"enabled\". Give each value a unique name with x-fern-enum.",
+    "location": "openapi.yaml#/components/schemas/Status/x-fern-enum/enabled/name"
+  }
+]

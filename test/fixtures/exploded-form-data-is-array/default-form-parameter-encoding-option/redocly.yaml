@@ -1,0 +1,4 @@
+rules:
+  fern/exploded-form-data-is-array:
+    severity: error
+    defaultFormParameterEncoding: form

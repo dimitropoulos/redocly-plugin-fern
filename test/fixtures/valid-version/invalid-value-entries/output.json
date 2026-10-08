@@ -1,0 +1,14 @@
+[
+  {
+    "ruleId": "fern/valid-version",
+    "severity": "error",
+    "message": "x-fern-version values must be strings, or objects with a string `value`.",
+    "location": "openapi.yaml#/x-fern-version/values/0"
+  },
+  {
+    "ruleId": "fern/valid-version",
+    "severity": "error",
+    "message": "x-fern-version values must be strings, or objects with a string `value`.",
+    "location": "openapi.yaml#/x-fern-version/values/1/value"
+  }
+]

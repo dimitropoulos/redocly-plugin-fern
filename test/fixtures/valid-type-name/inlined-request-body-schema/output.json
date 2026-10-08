@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-type-name",
+    "severity": "error",
+    "message": "Type name must begin with a letter: the request of POST /plants (named after its request body schema components.schemas.10000Plants, which Fern inlines into the request) is named \"10000Plants\". Rename it with x-fern-request-name on the operation.",
+    "location": "openapi.yaml#/paths/~1plants/post/requestBody/content/application~1json/schema"
+  }
+]

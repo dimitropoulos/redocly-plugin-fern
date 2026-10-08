@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/no-missing-auth",
+    "severity": "error",
+    "message": "Operation requires auth, but no auth is defined: Fern does not support any of the security schemes in its `security`: cookie (apiKey in cookie). Fern supports apiKey in a header, http bearer, http basic, oauth2 and openIdConnect security schemes.",
+    "location": "openapi.yaml#/paths/~1items/get/security (key)"
+  }
+]

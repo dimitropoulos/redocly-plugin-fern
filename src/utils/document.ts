@@ -161,17 +161,12 @@ export function endpointId(operation: OperationInfo): string {
     : operationLabel(operation);
 }
 
+// Fern's JSON media type test: any media type containing "json", or the "*/*" wildcard.
 export function isJsonMediaType(mediaType: string): boolean {
-  const base = mediaType.split(";")[0]!.trim().toLowerCase();
-  return (
-    base === "application/json" ||
-    base.endsWith("+json") ||
-    base === "*/*" ||
-    base === "application/*"
-  );
+  return mediaType.includes("json") || mediaType === "*/*";
 }
 
-/** The first JSON media type entry of a `content` map. */
+/** The first JSON media type entry of a `content` map, in document order (as Fern picks it). */
 export function getJsonMediaType(
   ctx: Ctx,
   container: Located | undefined,
@@ -183,12 +178,7 @@ export function getJsonMediaType(
   if (content === undefined || !isPlainObject(content.node)) {
     return undefined;
   }
-  const mediaTypes = Object.keys(content.node);
-  const mediaType =
-    mediaTypes.find(
-      candidate =>
-        candidate.split(";")[0]!.trim().toLowerCase() === "application/json",
-    ) ?? mediaTypes.find(isJsonMediaType);
+  const mediaType = Object.keys(content.node).find(isJsonMediaType);
   if (mediaType === undefined) {
     return undefined;
   }
@@ -223,15 +213,6 @@ export function getRequestBody(
     { node: operation.node, location: operation.location },
     "requestBody",
   );
-}
-
-/** Schema of the JSON request body, if any. */
-export function getJsonRequestSchema(
-  ctx: Ctx,
-  operation: OperationInfo,
-): Located | undefined {
-  const mediaType = getJsonMediaType(ctx, getRequestBody(ctx, operation));
-  return mediaType === undefined ? undefined : schemaOfMediaType(mediaType);
 }
 
 export function schemaOfMediaType(mediaType: Located): Located | undefined {
@@ -272,21 +253,31 @@ export function getResponse(
 
 const SUCCESS_STATUS_CODES = ["200", "201", "202", "204"];
 
+function hasContent(response: Located): boolean {
+  const content = response.node?.content;
+  return isPlainObject(content) && Object.keys(content).length > 0;
+}
+
 /**
- * The response Fern treats as the endpoint's response: the first of 200, 201, 202 and 204
- * that exists, otherwise `default`.
+ * The response Fern treats as the endpoint's response: the first of 200, 201, 202 and 204 that
+ * declares content (falling back to the first of them that exists), or `default` when none of
+ * those status codes are present.
  */
 export function getSuccessResponse(
   ctx: Ctx,
   operation: OperationInfo,
 ): (Located & { statusCode: string }) | undefined {
-  for (const statusCode of [...SUCCESS_STATUS_CODES, "default"]) {
+  const present = SUCCESS_STATUS_CODES.flatMap(statusCode => {
     const response = getResponse(ctx, operation, statusCode);
-    if (response !== undefined) {
-      return { ...response, statusCode };
-    }
+    return response === undefined ? [] : [{ ...response, statusCode }];
+  });
+  if (present.length > 0) {
+    return present.find(hasContent) ?? present[0];
   }
-  return undefined;
+  const fallback = getResponse(ctx, operation, "default");
+  return fallback === undefined
+    ? undefined
+    : { ...fallback, statusCode: "default" };
 }
 
 /** Schema of the JSON success response, if any. */
@@ -296,24 +287,6 @@ export function getJsonResponseSchema(
 ): Located | undefined {
   const mediaType = getJsonMediaType(ctx, getSuccessResponse(ctx, operation));
   return mediaType === undefined ? undefined : schemaOfMediaType(mediaType);
-}
-
-/** Whether the operation streams server-sent events. */
-export function isServerSentEvents(
-  ctx: Ctx,
-  operation: OperationInfo,
-): boolean {
-  const streaming = operation.node["x-fern-streaming"];
-  if (isPlainObject(streaming) && streaming.format === "sse") {
-    return true;
-  }
-  return (
-    getMediaType(
-      ctx,
-      getSuccessResponse(ctx, operation),
-      "text/event-stream",
-    ) !== undefined
-  );
 }
 
 /** The root of the document as a {@link Located}. */

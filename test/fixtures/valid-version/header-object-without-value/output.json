@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-version",
+    "severity": "error",
+    "message": "x-fern-version `header` must be a header name, or an object whose `value` is the header name.",
+    "location": "openapi.yaml#/x-fern-version/header/value"
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-version",
+    "severity": "error",
+    "message": "x-fern-version must specify the `header` that carries the version.",
+    "location": "openapi.yaml#/x-fern-version/header (key)"
+  }
+]

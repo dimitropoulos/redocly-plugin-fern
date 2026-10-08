@@ -66,7 +66,7 @@ export async function lintCase(
       const result: FixtureProblem = {
         ruleId: problem.ruleId,
         severity: problem.severity,
-        message: problem.message,
+        message: problem.message.replaceAll(caseDirectory, "<fixture>"),
         location:
           problem.location[0] === undefined
             ? ""

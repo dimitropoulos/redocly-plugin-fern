@@ -1,0 +1,26 @@
+[
+  {
+    "ruleId": "fern/valid-global-parameters",
+    "severity": "error",
+    "message": "Global parameter at index 0 has no string `name`, so Fern ignores it.",
+    "location": "openapi.yaml#/x-fern-global-parameters/0/name"
+  },
+  {
+    "ruleId": "fern/valid-global-parameters",
+    "severity": "error",
+    "message": "Global parameter at index 1 has no string `name`, so Fern ignores it.",
+    "location": "openapi.yaml#/x-fern-global-parameters/1/name"
+  },
+  {
+    "ruleId": "fern/valid-global-parameters",
+    "severity": "error",
+    "message": "Global parameter at index 2 has no string `name`, so Fern ignores it.",
+    "location": "openapi.yaml#/x-fern-global-parameters/2"
+  },
+  {
+    "ruleId": "fern/valid-global-parameters",
+    "severity": "error",
+    "message": "Global parameter at index 3 has no string `name`, so Fern ignores it.",
+    "location": "openapi.yaml#/x-fern-global-parameters/3"
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "ruleId": "fern/valid-example-endpoint-call",
+    "severity": "error",
+    "message": "Invalid header \"X-Api-Version\" example: Expected example to be \"2024-01-01\". Example is: \"2023-01-01\" (Fern turns a header's string default into a constant)",
+    "location": "openapi.yaml#/paths/~1plants/get/x-fern-examples/1/headers/X-Api-Version"
+  },
+  {
+    "ruleId": "fern/valid-example-endpoint-call",
+    "severity": "error",
+    "message": "Example is missing required header \"X-Api-Version\"",
+    "location": "openapi.yaml#/paths/~1plants/get/x-fern-examples/2/headers (key)"
+  }
+]

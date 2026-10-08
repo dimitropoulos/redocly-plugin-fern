@@ -1,0 +1,10 @@
+openapi: 3.1.0
+info:
+  title: Test API
+  version: 1.0.0
+x-fern-webhook-signature:
+  type: hmac
+  header: X-Signature
+  algorithm: md5
+  encoding: base32
+paths: {}

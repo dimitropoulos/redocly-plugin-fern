@@ -211,15 +211,6 @@ export function collectProperties(
   return result;
 }
 
-/** Finds a property by key among {@link collectProperties}. */
-export function findProperty(
-  ctx: Ctx,
-  located: Located | undefined,
-  key: string,
-): CollectedProperty | undefined {
-  return collectProperties(ctx, located).find(property => property.key === key);
-}
-
 /** The last segment of a `$ref`, used for messages. */
 export function refName(ref: string): string {
   const fragment = ref.includes("#") ? ref.slice(ref.indexOf("#") + 1) : ref;

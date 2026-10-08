@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/no-duplicate-declarations",
+    "severity": "error",
+    "message": "The schema components.schemas.Plant (named by its x-fern-type-name) is named \"Tree\", which is already declared by the schema components.schemas.Tree at #/components/schemas/Tree. Rename one of them with x-fern-type-name.",
+    "location": "plant.yaml#/x-fern-type-name"
+  }
+]

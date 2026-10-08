@@ -1,0 +1,54 @@
+openapi: 3.1.0
+info:
+  title: Sample API
+  version: 1.0.0
+paths:
+  /a:
+    get:
+      operationId: a
+      x-fern-sdk-group-name: 42
+      x-fern-sdk-method-name: list
+      responses:
+        "200":
+          description: OK
+  /b:
+    get:
+      operationId: b
+      x-fern-sdk-group-name: 42
+      x-fern-sdk-method-name: list
+      responses:
+        "200":
+          description: OK
+  /c:
+    get:
+      operationId: c
+      x-fern-sdk-group-name: plants
+      x-fern-sdk-method-name: [list]
+      responses:
+        "200":
+          description: OK
+  /d:
+    get:
+      operationId: d
+      x-fern-sdk-group-name: plants
+      x-fern-sdk-method-name: [list]
+      responses:
+        "200":
+          description: OK
+  /e:
+    get:
+      operationId: e
+      x-fern-sdk-group-name: []
+      x-fern-sdk-method-name: list
+      responses:
+        "200":
+          description: OK
+  /f:
+    get:
+      operationId: f
+      x-fern-sdk-group-name: []
+      x-fern-sdk-method-name: list
+      x-fern-audiences: { admin: true }
+      responses:
+        "200":
+          description: OK

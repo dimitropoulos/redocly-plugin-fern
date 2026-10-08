@@ -1,0 +1,14 @@
+[
+  {
+    "ruleId": "fern/no-response-property",
+    "severity": "error",
+    "message": "Response does not have a property named chunk. x-fern-sdk-return-value must name a top-level property of the response of endpoint jsonStreamMissing.",
+    "location": "openapi.yaml#/paths/~1b/post/x-fern-sdk-return-value"
+  },
+  {
+    "ruleId": "fern/no-response-property",
+    "severity": "error",
+    "message": "Response does not have a property named data. x-fern-sdk-return-value must name a top-level property of the response of endpoint conditionMissing.",
+    "location": "openapi.yaml#/paths/~1d/post/x-fern-sdk-return-value"
+  }
+]

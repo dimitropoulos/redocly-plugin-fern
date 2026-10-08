@@ -1,0 +1,14 @@
+[
+  {
+    "ruleId": "fern/valid-oauth",
+    "severity": "error",
+    "message": "Failed to resolve endpoint GET /token: the document has no such operation. Use \"METHOD /path\" as written under paths, or an operationId.",
+    "location": "openapi.yaml#/paths"
+  },
+  {
+    "ruleId": "fern/valid-oauth",
+    "severity": "error",
+    "message": "Failed to resolve endpoint POST /oauth/token: the document has no such operation. Use \"METHOD /path\" as written under paths, or an operationId.",
+    "location": "openapi.yaml#/paths"
+  }
+]

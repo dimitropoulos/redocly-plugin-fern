@@ -1,0 +1,14 @@
+[
+  {
+    "ruleId": "security-defined",
+    "severity": "error",
+    "message": "There is no `missingScheme` security scheme defined.",
+    "location": "openapi.yaml#/paths/~1items/get/security/0/missingScheme (key)"
+  },
+  {
+    "ruleId": "security-defined",
+    "severity": "error",
+    "message": "There is no `rootScheme` security scheme defined.",
+    "location": "openapi.yaml#/security/0/rootScheme (key)"
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/no-duplicate-declarations",
+    "severity": "error",
+    "message": "The schema components.schemas.Needle (named by its x-fern-type-name) is named \"Foliage\", which is already declared by the schema components.schemas.Leaf (named by its x-fern-type-name) at #/components/schemas/Leaf/x-fern-type-name. Rename one of them with x-fern-type-name.",
+    "location": "openapi.yaml#/components/schemas/Needle/x-fern-type-name"
+  }
+]

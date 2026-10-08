@@ -1,0 +1,3 @@
+rules:
+  fern/no-conflicting-request-wrapper-properties: error
+  fern/no-conflicting-parameter-names: error

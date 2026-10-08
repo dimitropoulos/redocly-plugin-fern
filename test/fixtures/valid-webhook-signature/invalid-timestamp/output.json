@@ -1,0 +1,32 @@
+[
+  {
+    "ruleId": "fern/valid-webhook-signature",
+    "severity": "error",
+    "message": "Invalid timestamp format \"rfc3339\". Must be one of: unix-seconds, unix-millis, iso8601",
+    "location": "openapi.yaml#/webhooks/a/post/x-fern-webhook-signature/timestamp/format"
+  },
+  {
+    "ruleId": "fern/valid-webhook-signature",
+    "severity": "error",
+    "message": "x-fern-webhook-signature timestamp must specify a header",
+    "location": "openapi.yaml#/webhooks/a/post/x-fern-webhook-signature/timestamp/header (key)"
+  },
+  {
+    "ruleId": "fern/valid-webhook-signature",
+    "severity": "error",
+    "message": "x-fern-webhook-signature timestamp tolerance must be a positive number",
+    "location": "openapi.yaml#/webhooks/a/post/x-fern-webhook-signature/timestamp/tolerance"
+  },
+  {
+    "ruleId": "fern/valid-webhook-signature",
+    "severity": "error",
+    "message": "x-fern-webhook-signature timestamp tolerance must be a positive number",
+    "location": "openapi.yaml#/webhooks/b/post/x-fern-webhook-signature/timestamp/tolerance"
+  },
+  {
+    "ruleId": "fern/valid-webhook-signature",
+    "severity": "error",
+    "message": "x-fern-webhook-signature timestamp must be an object with a header.",
+    "location": "openapi.yaml#/webhooks/c/post/x-fern-webhook-signature/timestamp"
+  }
+]

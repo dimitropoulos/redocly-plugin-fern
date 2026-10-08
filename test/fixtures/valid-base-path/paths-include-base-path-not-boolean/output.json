@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-base-path",
+    "severity": "error",
+    "message": "x-fern-base-path `paths-include-base-path` must be a boolean; Fern only strips the base path from paths when it is `true`.",
+    "location": "openapi.yaml#/x-fern-base-path/paths-include-base-path"
+  }
+]

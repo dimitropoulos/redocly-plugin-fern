@@ -8,20 +8,30 @@ import type {
 
 export const PLUGIN_ID = "fern";
 
+export interface BuiltInRule {
+  severity: Severity;
+  /** Fern rules (or parts of them) the built-in rule implements. */
+  fernRules: string[];
+  /**
+   * Whether `fern/recommended` enables the rule. Rules that also enforce things Fern does not
+   * require are left for you to opt into.
+   */
+  recommended: boolean;
+}
+
 /**
  * Built-in Redocly rules that already implement checks Fern performs. The plugin does not
- * re-implement these; `fern/recommended` turns them on instead.
+ * re-implement these.
  */
-export const builtInRules: Record<
-  string,
-  { severity: Severity; fernRules: string[] }
-> = {
+export const builtInRules: Record<string, BuiltInRule> = {
   struct: {
     severity: "error",
+    recommended: true,
     fernRules: ["fern-definition/valid-endpoint-path"],
   },
   "no-unresolved-refs": {
     severity: "error",
+    recommended: true,
     fernRules: [
       "fern-definition/import-file-exists",
       "fern-definition/no-undefined-type-reference",
@@ -30,14 +40,17 @@ export const builtInRules: Record<
   },
   "path-params-defined": {
     severity: "error",
+    recommended: true,
     fernRules: ["fern-definition/no-undefined-path-parameters"],
   },
   "no-duplicated-enum-values": {
     severity: "error",
+    recommended: true,
     fernRules: ["fern-definition/no-duplicate-enum-values"],
   },
   "no-invalid-media-type-examples": {
     severity: "error",
+    recommended: true,
     fernRules: [
       "fern-definition/valid-example-error",
       "docs/valid-openapi-examples",
@@ -45,14 +58,18 @@ export const builtInRules: Record<
   },
   "no-invalid-schema-examples": {
     severity: "error",
+    recommended: true,
     fernRules: ["fern-definition/valid-example-type"],
   },
   "security-defined": {
     severity: "error",
+    // Also requires every operation to declare security, which Fern does not.
+    recommended: false,
     fernRules: ["fern-definition/no-missing-auth"],
   },
   "operation-operationId-unique": {
     severity: "error",
+    recommended: true,
     fernRules: ["fern-definition/no-duplicate-declarations"],
   },
 };
@@ -69,8 +86,12 @@ function rulesFor(spec: "oas3" | "oas2"): Record<string, Oas3Rule | Oas2Rule> {
 
 function recommendedRules(): Record<string, Severity> {
   const rules: Record<string, Severity> = {};
-  for (const [name, { severity }] of Object.entries(builtInRules)) {
-    rules[name] = severity;
+  for (const [name, { severity, recommended }] of Object.entries(
+    builtInRules,
+  )) {
+    if (recommended) {
+      rules[name] = severity;
+    }
   }
   for (const definition of ruleDefinitions) {
     rules[`${PLUGIN_ID}/${definition.name}`] = definition.severity;

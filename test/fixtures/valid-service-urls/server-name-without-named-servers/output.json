@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-service-urls",
+    "severity": "error",
+    "message": "URL 'Upload' in x-fern-server-name on GET /files is not recognized: no operation- or path-level server with a url has x-fern-server-name 'Upload'.\nSpecify one of the configured base URLs:\n  - Base",
+    "location": "openapi.yaml#/paths/~1files/get/x-fern-server-name"
+  }
+]

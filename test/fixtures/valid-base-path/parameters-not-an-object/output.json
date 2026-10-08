@@ -1,0 +1,8 @@
+[
+  {
+    "ruleId": "fern/valid-base-path",
+    "severity": "error",
+    "message": "x-fern-base-path `parameters` must be an object keyed by path parameter name; Fern ignores this value.",
+    "location": "openapi.yaml#/x-fern-base-path/parameters"
+  }
+]

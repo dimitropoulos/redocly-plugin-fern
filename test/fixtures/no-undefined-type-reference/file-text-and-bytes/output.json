@@ -1,0 +1,26 @@
+[
+  {
+    "ruleId": "fern/no-undefined-type-reference",
+    "severity": "error",
+    "message": "The bytes type can only be used as a request, which x-fern-type cannot express; use an application/octet-stream request body instead.",
+    "location": "openapi.yaml#/paths/~1raw/post/requestBody/content/application~1octet-stream/schema/x-fern-type"
+  },
+  {
+    "ruleId": "fern/no-undefined-type-reference",
+    "severity": "error",
+    "message": "The file type can only be used as properties in inlined requests, which x-fern-type cannot express; use a multipart/form-data request property with type: string and format: binary instead.",
+    "location": "openapi.yaml#/paths/~1upload/post/requestBody/content/multipart~1form-data/schema/properties/file/x-fern-type"
+  },
+  {
+    "ruleId": "fern/no-undefined-type-reference",
+    "severity": "error",
+    "message": "The file type can only be used as properties in inlined requests, which x-fern-type cannot express; use a multipart/form-data request property with type: string and format: binary instead.",
+    "location": "openapi.yaml#/paths/~1upload/post/requestBody/content/multipart~1form-data/schema/properties/files/x-fern-type"
+  },
+  {
+    "ruleId": "fern/no-undefined-type-reference",
+    "severity": "error",
+    "message": "The text type can only be used as a response or response-stream, which x-fern-type cannot express; use a text/plain response instead.",
+    "location": "openapi.yaml#/paths/~1upload/post/responses/200/content/text~1plain/schema/x-fern-type"
+  }
+]
