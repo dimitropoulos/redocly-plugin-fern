@@ -20,10 +20,11 @@ built-in rule.
 
 ## Usage
 
-The plugin isn't published to npm. Install it from GitHub; the `prepare` script builds it:
+The plugin isn't published to npm. Install the built package from a GitHub release:
 
 ```sh
-pnpm add --save-dev github:dimitropoulos/redocly-plugin-fern @redocly/cli
+pnpm add --save-dev @redocly/cli \
+  https://github.com/dimitropoulos/redocly-plugin-fern/releases/download/v0.1.0/redocly-plugin-fern-0.1.0.tgz
 ```
 
 ```yaml

@@ -17,6 +17,8 @@ export interface BuiltInRule {
    * require are left for you to opt into.
    */
   recommended: boolean;
+  /** Set when the built-in rule only exists for OpenAPI 3. */
+  spec?: "oas3";
 }
 
 /**
@@ -51,6 +53,7 @@ export const builtInRules: Record<string, BuiltInRule> = {
   "no-invalid-media-type-examples": {
     severity: "error",
     recommended: true,
+    spec: "oas3",
     fernRules: [
       "fern-definition/valid-example-error",
       "docs/valid-openapi-examples",
@@ -78,23 +81,36 @@ function rulesFor(spec: "oas3" | "oas2"): Record<string, Oas3Rule | Oas2Rule> {
   return result;
 }
 
-function recommendedRules(): Record<string, Severity> {
+/**
+ * The recommended config. Plugin rules go in per-version rule maps, so Redocly does not warn about
+ * rules that do not apply to the linted document's version.
+ */
+function recommendedConfig() {
   const rules: Record<string, Severity> = {};
-  for (const [name, { severity, recommended }] of Object.entries(
+  const oas3Rules: Record<string, Severity> = {};
+  const oas2Rules: Record<string, Severity> = {};
+  for (const [name, { severity, recommended, spec }] of Object.entries(
     builtInRules,
   )) {
     if (recommended) {
-      rules[name] = severity;
+      (spec === "oas3" ? oas3Rules : rules)[name] = severity;
     }
   }
   for (const definition of ruleDefinitions) {
-    rules[`${PLUGIN_ID}/${definition.name}`] = definition.severity;
+    const target =
+      (definition.spec ?? "oas3") === "oas2" ? oas2Rules : oas3Rules;
+    target[`${PLUGIN_ID}/${definition.name}`] = definition.severity;
   }
-  return rules;
+  return {
+    rules,
+    oas2Rules,
+    oas3_0Rules: oas3Rules,
+    oas3_1Rules: oas3Rules,
+    oas3_2Rules: oas3Rules,
+  };
 }
 
 export default function fernPlugin() {
-  const recommended = recommendedRules();
   return {
     id: PLUGIN_ID,
     rules: {
@@ -102,7 +118,7 @@ export default function fernPlugin() {
       oas2: rulesFor("oas2") as Record<string, Oas2Rule>,
     },
     configs: {
-      recommended: { rules: recommended },
+      recommended: recommendedConfig(),
     },
   };
 }
