@@ -8,10 +8,10 @@ components:
   schemas:
     Count:
       type: string
-      enum: ["1", one, "2", three]
+      enum: ["1", One, "2", three]
     Plant:
       type: object
       properties:
         size:
           type: string
-          enum: [in-progress, In_Progress, inProgress]
+          enum: [in-progress, In_Progress, InProgress]

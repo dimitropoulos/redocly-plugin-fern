@@ -9,7 +9,7 @@ components:
     Status:
       type: string
       enum: [ok, okay, failed]
-      x-enum-varnames: [OK, ok, FAILED]
+      x-enum-varnames: [OK, OK, FAILED]
     Level:
       type: string
       enum: [low, high]
