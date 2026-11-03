@@ -6,9 +6,8 @@
  * must not end up with the same name. Repeating the same key across `allOf` members is fine: Fern
  * merges those.
  *
- * Enums: a value's Fern name is its valid `x-fern-enum.<value>.name`, else its valid
- * `x-enum-varnames` entry, else the value (or a name generated from it). Two enum values must not
- * end up with the same name.
+ * Enums: a value's Fern name is its valid `x-fern-enum.<value>.name` or `x-enum-varnames` entry,
+ * else its literal wire value. Two enum values must not end up with the same name.
  *
  * Discriminated unions are keyed by `discriminator.mapping`, whose keys are unique, so they are not
  * checked. Inline request body schemas are not checked either: Fern renames clashing request
@@ -171,17 +170,14 @@ function checkEnum(
   }
   const kept = new Map<string, { value: string; name: string }>();
   for (const value of fernEnum.values) {
-    const key = value.name;
+    const key = value.overrideIsValid ? value.override!.name : value.value;
     const first = kept.get(key);
     if (first === undefined) {
-      kept.set(key, { value: value.value, name: value.name });
+      kept.set(key, { value: value.value, name: key });
       continue;
     }
 
-    const clash =
-      value.name === ""
-        ? `Fern cannot generate a name for it, nor for the earlier value "${first.value}"`
-        : `its name "${value.name}" is also the name of the earlier value "${first.value}"`;
+    const clash = `its name "${key}" is also the name of the earlier value "${first.value}"`;
     ctx.report({
       message: `Fern silently drops enum value "${value.value}" from the generated SDK: ${clash}. Give each value a unique name with x-fern-enum.`,
       location: value.overrideIsValid

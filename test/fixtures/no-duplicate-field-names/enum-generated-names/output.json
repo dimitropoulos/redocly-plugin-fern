@@ -1,14 +1,1 @@
-[
-  {
-    "ruleId": "fern/no-duplicate-field-names",
-    "severity": "error",
-    "message": "Fern silently drops enum value \"One\" from the generated SDK: its name \"One\" is also the name of the earlier value \"1\". Give each value a unique name with x-fern-enum.",
-    "location": "openapi.yaml#/components/schemas/Count/enum/1"
-  },
-  {
-    "ruleId": "fern/no-duplicate-field-names",
-    "severity": "error",
-    "message": "Fern silently drops enum value \"InProgress\" from the generated SDK: its name \"InProgress\" is also the name of the earlier value \"in-progress\". Give each value a unique name with x-fern-enum.",
-    "location": "openapi.yaml#/components/schemas/Plant/properties/size/enum/2"
-  }
-]
+[]

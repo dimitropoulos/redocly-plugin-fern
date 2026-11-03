@@ -97,6 +97,9 @@ function recommendedConfig() {
     }
   }
   for (const definition of ruleDefinitions) {
+    if (definition.recommended === false) {
+      continue;
+    }
     const target =
       (definition.spec ?? "oas3") === "oas2" ? oas2Rules : oas3Rules;
     target[`${PLUGIN_ID}/${definition.name}`] = definition.severity;
