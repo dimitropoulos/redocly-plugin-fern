@@ -20,7 +20,9 @@ built-in rule.
 
 ## Usage
 
-The plugin isn't published to npm. Install the built package from a GitHub release:
+The plugin isn't published to npm. Install the built package from a
+[GitHub release](https://github.com/dimitropoulos/redocly-plugin-fern/releases/latest) (replace
+`0.1.1` with the latest version):
 
 ```sh
 pnpm add --save-dev @redocly/cli \
