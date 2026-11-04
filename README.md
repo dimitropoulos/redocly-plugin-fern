@@ -24,7 +24,7 @@ The plugin isn't published to npm. Install the built package from a GitHub relea
 
 ```sh
 pnpm add --save-dev @redocly/cli \
-  https://github.com/dimitropoulos/redocly-plugin-fern/releases/download/v0.1.0/redocly-plugin-fern-0.1.0.tgz
+  https://github.com/dimitropoulos/redocly-plugin-fern/releases/download/v0.1.1/redocly-plugin-fern-0.1.1.tgz
 ```
 
 ```yaml
