@@ -28,6 +28,7 @@ export const noSchemaTitleCollisions: RuleDefinition = {
   name: "no-schema-title-collisions",
   fernRules: ["oss/no-schema-title-collisions"],
   severity: "error",
+  recommended: false,
   description:
     "Component schemas must not share a title when Fern uses titles as schema names.",
   rule: (options: Options = {}) => ({

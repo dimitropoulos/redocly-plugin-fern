@@ -13,6 +13,6 @@ components:
         active:
           name: On
         enabled:
-          name: on
+          name: On
         inactive:
           name: Off

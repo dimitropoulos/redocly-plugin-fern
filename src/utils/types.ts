@@ -26,6 +26,8 @@ export interface RuleDefinition {
   fernRules: string[];
   /** Severity used by the plugin's `recommended` config. */
   severity: Severity;
+  /** Whether `fern/recommended` enables the rule. Defaults to `true`. */
+  recommended?: boolean;
   /** One-line description for docs. */
   description: string;
   /** Spec family the rule runs on. Defaults to `oas3`. */
